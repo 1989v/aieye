@@ -60,13 +60,36 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                             } else {
                                 if let Some(win) = app.get_webview_window("panel") {
                                     let scale = win.scale_factor().unwrap_or(2.0);
-                                    let (tx, ty, _tw, th) = extract_rect(&rect);
-                                    // muxbar / SwiftUI MenuBarExtra 관례: panel 좌측 끝 = 아이콘
-                                    // 좌측 끝 → 아이콘 우측하단으로 펼쳐짐
+                                    let (tx, ty, tw, th) = extract_rect(&rect);
                                     let left_edge = tx / scale;
+                                    let right_edge = (tx + tw) / scale;
                                     let bottom_y = (ty + th) / scale;
+                                    const PANEL_W: f64 = 360.0;
                                     const GAP: f64 = 4.0;
-                                    let x = left_edge;
+                                    const EDGE_MARGIN: f64 = 8.0;
+
+                                    // 기본: 아이콘 좌측 끝 기준으로 우측 하단 펼침
+                                    // 화면 우측 경계를 넘으면 우측 끝 기준으로 좌측 하단 펼침
+                                    let (screen_left, screen_right) = match win.current_monitor() {
+                                        Ok(Some(m)) => {
+                                            let pos = m.position();
+                                            let size = m.size();
+                                            (
+                                                pos.x as f64 / scale,
+                                                (pos.x as f64 + size.width as f64) / scale,
+                                            )
+                                        }
+                                        _ => (0.0, f64::MAX),
+                                    };
+
+                                    let right_aligned = left_edge + PANEL_W > screen_right - EDGE_MARGIN;
+                                    let x = if right_aligned {
+                                        // 우측 끝 기준 좌측으로 펼침
+                                        (right_edge - PANEL_W).max(screen_left + EDGE_MARGIN)
+                                    } else {
+                                        left_edge
+                                    };
+
                                     let y = bottom_y + GAP;
                                     let _ = win.set_position(LogicalPosition::new(x, y));
                                 }
