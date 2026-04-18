@@ -31,18 +31,6 @@ pub fn run() {
                 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
                 use tauri_nspanel::{panel_delegate, WebviewWindowExt};
                 if let Some(win) = app.get_webview_window("panel") {
-                    // 네이티브 popover 스타일: 블러 vibrancy + 둥근 모서리 10pt
-                    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
-                    // HudWindow — 가장 낮은 명도, muxbar tone 에 근접
-                    if let Err(e) = apply_vibrancy(
-                        &win,
-                        NSVisualEffectMaterial::HudWindow,
-                        Some(NSVisualEffectState::Active),
-                        Some(10.0),
-                    ) {
-                        tracing::warn!("apply_vibrancy failed: {e:?}");
-                    }
-
                     match win.to_panel() {
                         Ok(panel) => {
                             tracing::info!("panel window converted to NSPanel");
@@ -54,6 +42,20 @@ pub fn run() {
                                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
                                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
                             );
+
+                            // to_panel() 이후에 vibrancy 적용 — NSPanel 전환으로
+                            // contentView 가 교체된 뒤에 NSVisualEffectView 삽입.
+                            use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+                            if let Err(e) = apply_vibrancy(
+                                &win,
+                                NSVisualEffectMaterial::HudWindow,
+                                Some(NSVisualEffectState::Active),
+                                Some(10.0),
+                            ) {
+                                tracing::warn!("apply_vibrancy failed: {e:?}");
+                            } else {
+                                tracing::info!("vibrancy applied: HudWindow");
+                            }
 
                             // 외부 클릭 시 자동 닫힘 (포커스 잃으면 order_out)
                             let panel_for_delegate = panel.clone();
