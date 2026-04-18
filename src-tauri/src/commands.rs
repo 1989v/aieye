@@ -38,6 +38,15 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn list_installed_terminals() -> Vec<TerminalApp> {
+    TerminalApp::all()
+        .iter()
+        .copied()
+        .filter(|t| t.is_installed())
+        .collect()
+}
+
+#[tauri::command]
 pub fn get_settings() -> Settings {
     settings::load()
 }

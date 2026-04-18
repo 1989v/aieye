@@ -22,6 +22,7 @@ pub fn run() {
             commands::list_sessions,
             commands::resume_session,
             commands::reveal_in_finder,
+            commands::list_installed_terminals,
             commands::get_settings,
             commands::set_settings
         ]);

@@ -1,20 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { TerminalApp } from "../types/session";
 import { useSettings } from "../hooks/useSettings";
+import { listInstalledTerminals } from "../ipc/tauri";
 
-const TERMINALS: { value: TerminalApp; label: string }[] = [
-  { value: "terminal", label: "Terminal" },
-  { value: "iterm2", label: "iTerm2" },
-  { value: "warp", label: "Warp" },
-  { value: "alacritty", label: "Alacritty" },
-  { value: "kitty", label: "kitty" },
-];
+const LABELS: Record<TerminalApp, string> = {
+  terminal: "Terminal",
+  iterm2: "iTerm2",
+  warp: "Warp",
+  alacritty: "Alacritty",
+  kitty: "kitty",
+};
 
 export function SettingsMenu() {
   const { settings, update } = useSettings();
   const [open, setOpen] = useState(false);
+  const [installed, setInstalled] = useState<TerminalApp[] | null>(null);
+
+  useEffect(() => {
+    listInstalledTerminals().then(setInstalled).catch(() => setInstalled([]));
+  }, []);
 
   if (!settings) return null;
+
+  const options = installed ?? [];
 
   return (
     <div className="settings-menu">
@@ -29,9 +37,14 @@ export function SettingsMenu() {
               value={settings.preferred_terminal}
               onChange={(e) => update({ preferred_terminal: e.target.value as TerminalApp })}
             >
-              {TERMINALS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {options.length === 0 && (
+                <option value={settings.preferred_terminal}>
+                  {LABELS[settings.preferred_terminal]}
+                </option>
+              )}
+              {options.map((t) => (
+                <option key={t} value={t}>
+                  {LABELS[t]}
                 </option>
               ))}
             </select>

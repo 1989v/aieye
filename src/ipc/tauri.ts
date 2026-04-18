@@ -14,6 +14,10 @@ export async function revealInFinder(path: string): Promise<void> {
   await invoke("reveal_in_finder", { path });
 }
 
+export async function listInstalledTerminals(): Promise<TerminalApp[]> {
+  return invoke<TerminalApp[]>("list_installed_terminals");
+}
+
 export async function getSettings(): Promise<Settings> {
   return invoke<Settings>("get_settings");
 }

@@ -12,6 +12,16 @@ pub enum TerminalApp {
 }
 
 impl TerminalApp {
+    pub fn all() -> &'static [TerminalApp] {
+        &[
+            TerminalApp::Terminal,
+            TerminalApp::Iterm2,
+            TerminalApp::Warp,
+            TerminalApp::Alacritty,
+            TerminalApp::Kitty,
+        ]
+    }
+
     pub fn bundle_id(self) -> &'static str {
         match self {
             TerminalApp::Terminal => "com.apple.Terminal",
@@ -20,6 +30,23 @@ impl TerminalApp {
             TerminalApp::Alacritty => "org.alacritty",
             TerminalApp::Kitty => "net.kovidgoyal.kitty",
         }
+    }
+
+    /// mdfind 로 bundle id 매칭되는 .app 이 시스템에 존재하는지 확인.
+    /// macOS 는 Terminal 은 기본 내장이지만 확인 결과에도 포함됨.
+    pub fn is_installed(self) -> bool {
+        let q = format!("kMDItemCFBundleIdentifier == '{}'", self.bundle_id());
+        std::process::Command::new("mdfind")
+            .args(["-onlyin", "/Applications", &q])
+            .output()
+            .ok()
+            .map(|out| !out.stdout.is_empty())
+            .unwrap_or(false)
+            || {
+                // macOS 시스템 Terminal.app 폴백
+                matches!(self, TerminalApp::Terminal)
+                    && std::path::Path::new("/System/Applications/Utilities/Terminal.app").exists()
+            }
     }
 }
 
@@ -55,19 +82,15 @@ fn launch_iterm2(cmd: &str) -> anyhow::Result<()> {
     run_osascript(&script)
 }
 
-/// Warp: URL scheme `warp://action/new_tab?path=<p>&command=<c>`.
-/// 값은 URL-encoding.
+/// Warp: URL scheme 안정성이 떨어져 — 대안으로 Warp 앱 활성화 + System Events
+/// 로 키스트로크 송신. Accessibility 권한 요구되지만 대부분의 유저가 이미
+/// 개발 워크플로우에 권한 부여됨 (keyboard maestro 등).
 fn launch_warp(shell_command: &str) -> anyhow::Result<()> {
-    // shell_command 는 "cd '<cwd>' && claude --resume '<id>'" 형태.
-    // path 는 cwd, command 는 claude 부분만 전달하는 게 Warp UX 에 맞지만,
-    // 단순화를 위해 command 한 덩어리 전체를 넘겨 Warp 가 bash 로 실행하게.
-    let encoded_cmd = url_encode(shell_command);
-    let url = format!("warp://action/new_tab?command={encoded_cmd}");
-    let status = Command::new("open").arg(&url).status()?;
-    if !status.success() {
-        anyhow::bail!("open warp:// exited with {status:?}");
-    }
-    Ok(())
+    let script = format!(
+        "tell application \"Warp\" to activate\ndelay 0.35\ntell application \"System Events\"\n  keystroke \"{}\"\n  key code 36\nend tell\n",
+        escape_applescript(shell_command)
+    );
+    run_osascript(&script)
 }
 
 fn launch_direct_binary(bin: &str, args: &[&str]) -> anyhow::Result<()> {
@@ -89,20 +112,4 @@ fn run_osascript(script: &str) -> anyhow::Result<()> {
 
 fn escape_applescript(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-/// RFC3986 기반 간이 URL 인코딩 (unreserved + path-safe 약간).
-fn url_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() * 3);
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char);
-            }
-            _ => {
-                out.push_str(&format!("%{:02X}", b));
-            }
-        }
-    }
-    out
 }
