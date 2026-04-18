@@ -60,13 +60,13 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                             } else {
                                 if let Some(win) = app.get_webview_window("panel") {
                                     let scale = win.scale_factor().unwrap_or(2.0);
-                                    let (tx, ty, tw, th) = extract_rect(&rect);
-                                    // 네이티브 메뉴바 popover 관례: panel 우측 끝 = 아이콘 우측 끝
-                                    let right_edge = (tx + tw) / scale;
+                                    let (tx, ty, _tw, th) = extract_rect(&rect);
+                                    // muxbar / SwiftUI MenuBarExtra 관례: panel 좌측 끝 = 아이콘
+                                    // 좌측 끝 → 아이콘 우측하단으로 펼쳐짐
+                                    let left_edge = tx / scale;
                                     let bottom_y = (ty + th) / scale;
-                                    const PANEL_W: f64 = 360.0;
                                     const GAP: f64 = 4.0;
-                                    let x = right_edge - PANEL_W;
+                                    let x = left_edge;
                                     let y = bottom_y + GAP;
                                     let _ = win.set_position(LogicalPosition::new(x, y));
                                 }
