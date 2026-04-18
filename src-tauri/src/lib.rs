@@ -43,6 +43,11 @@ pub fn run() {
                                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
                             );
 
+                            // NSWindow 를 완전 투명하게 (webview 가 올라가기 전에)
+                            if let Ok(ns) = win.ns_window() {
+                                macos_panel::make_window_transparent(ns);
+                            }
+
                             // to_panel() 이후에 vibrancy 적용 — NSPanel 전환으로
                             // contentView 가 교체된 뒤에 NSVisualEffectView 삽입.
                             use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
@@ -55,6 +60,27 @@ pub fn run() {
                                 tracing::warn!("apply_vibrancy failed: {e:?}");
                             } else {
                                 tracing::info!("vibrancy applied: HudWindow");
+                            }
+
+                            // WKWebView 자체를 투명 (기본 불투명 흰 배경 제거 → vibrancy 노출)
+                            #[cfg(target_os = "macos")]
+                            {
+                                use objc2::msg_send;
+                                use objc2::runtime::AnyObject;
+                                use objc2_foundation::NSString;
+                                let _ = win.with_webview(|webview| unsafe {
+                                    let wkwebview = webview.inner() as *mut AnyObject;
+                                    let key = NSString::from_str("drawsBackground");
+                                    let value: *mut AnyObject = std::ptr::null_mut();
+                                    // value = [NSNumber numberWithBool:NO] equivalent via kCFBooleanFalse
+                                    // simpler: use NSControlStateValueOff / pass nil for NO effectively?
+                                    // 가장 호환성 좋은 방법: setValue:@(NO) forKey:
+                                    let ns_number_class = objc2::runtime::AnyClass::get(c"NSNumber").unwrap();
+                                    let no_number: *mut AnyObject = msg_send![ns_number_class, numberWithBool: false];
+                                    let _ = value; // unused
+                                    let _: () = msg_send![wkwebview, setValue: no_number, forKey: &*key];
+                                    tracing::info!("WKWebView drawsBackground=NO set");
+                                });
                             }
 
                             // 외부 클릭 시 자동 닫힘 (포커스 잃으면 order_out)
