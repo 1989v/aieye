@@ -25,22 +25,32 @@ pub fn run() {
         .setup(|app| {
             tray::build_tray(app)?;
 
-            // macOS: panel window 를 NSPanel 로 변환해 full-screen 앱 위에도 뜨게.
             #[cfg(target_os = "macos")]
             {
                 use tauri::Manager;
+                use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
                 use tauri_nspanel::WebviewWindowExt;
                 if let Some(win) = app.get_webview_window("panel") {
                     match win.to_panel() {
-                        Ok(_panel) => {
+                        Ok(panel) => {
                             tracing::info!("panel window converted to NSPanel");
+
+                            // NSWindowStyleMaskNonactivatingPanel (1 << 7)
+                            panel.set_style_mask(1 << 7);
+                            // statusBar level — full-screen 앱 위
+                            panel.set_level(25);
+                            // canJoinAllSpaces | fullScreenAuxiliary | stationary
+                            panel.set_collection_behaviour(
+                                NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
+                                    | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
+                                    | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
+                            );
+
+                            tracing::info!("panel: style/level/collectionBehaviour set");
                         }
                         Err(e) => {
                             tracing::error!("to_panel failed: {e:?}");
                         }
-                    }
-                    if let Ok(ns) = win.ns_window() {
-                        macos_panel::elevate_to_panel(ns);
                     }
                 }
             }

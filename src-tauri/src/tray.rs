@@ -9,6 +9,8 @@ use tracing::info;
 use crate::macos_panel;
 
 #[cfg(target_os = "macos")]
+use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
+#[cfg(target_os = "macos")]
 use tauri_nspanel::ManagerExt;
 
 pub fn build_tray(app: &App) -> tauri::Result<()> {
@@ -36,8 +38,6 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
 
                 #[cfg(target_os = "macos")]
                 {
-                    // tauri-nspanel 의 Panel 로 show/hide — NSPanel 의 proper
-                    // orderFrontRegardless 호출로 full-screen 위 렌더링 보장.
                     match app.get_webview_panel("panel") {
                         Ok(panel) => {
                             if panel.is_visible() {
@@ -48,10 +48,14 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                                     let x = position.x / scale - 180.0;
                                     let y = position.y / scale + 6.0;
                                     let _ = win.set_position(LogicalPosition::new(x, y));
-                                    if let Ok(ns) = win.ns_window() {
-                                        macos_panel::elevate_to_panel(ns);
-                                    }
                                 }
+                                // 매 show 마다 level/collection 재적용
+                                panel.set_level(25);
+                                panel.set_collection_behaviour(
+                                    NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
+                                        | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
+                                        | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
+                                );
                                 panel.show();
                                 info!("panel.show() called");
                             }
