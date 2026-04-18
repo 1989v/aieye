@@ -1,4 +1,5 @@
 mod commands;
+mod macos_panel;
 mod parser;
 mod sessions;
 mod tray;
@@ -16,6 +17,16 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![commands::list_sessions])
         .setup(|app| {
             tray::build_tray(app)?;
+            // panel window 를 NSWindow popup 레벨로 승격 → full-screen 앱 위에도 출현
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager;
+                if let Some(win) = app.get_webview_window("panel") {
+                    if let Ok(ns) = win.ns_window() {
+                        macos_panel::elevate_to_panel(ns);
+                    }
+                }
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
