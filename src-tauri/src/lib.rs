@@ -31,6 +31,17 @@ pub fn run() {
                 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
                 use tauri_nspanel::{panel_delegate, WebviewWindowExt};
                 if let Some(win) = app.get_webview_window("panel") {
+                    // 네이티브 popover 스타일: 블러 vibrancy + 둥근 모서리 10pt
+                    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+                    if let Err(e) = apply_vibrancy(
+                        &win,
+                        NSVisualEffectMaterial::HudWindow,
+                        Some(NSVisualEffectState::Active),
+                        Some(10.0),
+                    ) {
+                        tracing::warn!("apply_vibrancy failed: {e:?}");
+                    }
+
                     match win.to_panel() {
                         Ok(panel) => {
                             tracing::info!("panel window converted to NSPanel");

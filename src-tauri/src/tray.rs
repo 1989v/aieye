@@ -60,13 +60,13 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                             } else {
                                 if let Some(win) = app.get_webview_window("panel") {
                                     let scale = win.scale_factor().unwrap_or(2.0);
-                                    // tray icon 의 rect → 메뉴바 하단 경계 기준으로 panel 위치
                                     let (tx, ty, tw, th) = extract_rect(&rect);
-                                    let center_x = (tx + tw / 2.0) / scale;
+                                    // 네이티브 메뉴바 popover 관례: panel 우측 끝 = 아이콘 우측 끝
+                                    let right_edge = (tx + tw) / scale;
                                     let bottom_y = (ty + th) / scale;
                                     const PANEL_W: f64 = 360.0;
                                     const GAP: f64 = 4.0;
-                                    let x = center_x - PANEL_W / 2.0;
+                                    let x = right_edge - PANEL_W;
                                     let y = bottom_y + GAP;
                                     let _ = win.set_position(LogicalPosition::new(x, y));
                                 }
