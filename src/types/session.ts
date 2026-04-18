@@ -2,6 +2,8 @@ export type CliKind = "claude" | "codex";
 
 export type SessionState = "running" | "recent" | "stale";
 
+export type TerminalApp = "terminal" | "iterm2" | "warp" | "alacritty" | "kitty";
+
 export interface Session {
   id: string;
   cli: CliKind;

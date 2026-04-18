@@ -121,3 +121,101 @@ body,
   white-space: nowrap;
   margin-top: 2px;
 }
+
+.session-row {
+  cursor: pointer;
+  position: relative;
+}
+
+.session-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.row-menu-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  padding: 4px 6px;
+  cursor: pointer;
+  opacity: 0.6;
+  align-self: center;
+}
+
+.row-menu-btn:hover {
+  opacity: 1;
+}
+
+.row-menu {
+  position: absolute;
+  right: 6px;
+  top: 32px;
+  background: rgba(50, 50, 50, 0.98);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.row-menu button {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.row-menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-menu {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 0 4px 0;
+}
+
+.settings-toggle {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 8px 14px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.settings-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-panel {
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.settings-panel label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-panel select,
+.settings-panel input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: inherit;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  min-width: 110px;
+}

@@ -1,6 +1,8 @@
 mod commands;
 mod parser;
+mod resume;
 mod sessions;
+mod settings;
 mod tray;
 
 #[cfg(target_os = "macos")]
@@ -16,7 +18,13 @@ pub fn run() {
         .init();
 
     let builder = tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::list_sessions]);
+        .invoke_handler(tauri::generate_handler![
+            commands::list_sessions,
+            commands::resume_session,
+            commands::reveal_in_finder,
+            commands::get_settings,
+            commands::set_settings
+        ]);
 
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());

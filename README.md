@@ -7,7 +7,7 @@
 [![Tauri v2](https://img.shields.io/badge/Tauri-v2-orange.svg)](https://tauri.app)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
 
-> **Status**: Plan 1 complete — Tauri skeleton + ClaudeAdapter. Lists real Claude Code sessions from `~/.claude/projects`.
+> **Status**: Plan 2 complete — Claude + Codex sessions, click-to-resume in preferred terminal, row actions, settings persistence.
 
 ## What it solves
 

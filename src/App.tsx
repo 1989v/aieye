@@ -1,6 +1,7 @@
 import "./styles.css";
 import { useSessions } from "./hooks/useSessions";
 import { SessionList } from "./components/SessionList";
+import { SettingsMenu } from "./components/SettingsMenu";
 
 export default function App() {
   const { sessions, error } = useSessions();
@@ -14,6 +15,7 @@ export default function App() {
       {error && <div className="error">{error}</div>}
       {sessions === null && !error && <div className="empty">Scanning…</div>}
       {sessions && <SessionList sessions={sessions} />}
+      <SettingsMenu />
     </div>
   );
 }
