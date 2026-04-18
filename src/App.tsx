@@ -1,34 +1,19 @@
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import "./styles.css";
+import { useSessions } from "./hooks/useSessions";
+import { SessionList } from "./components/SessionList";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+export default function App() {
+  const { sessions, error } = useSessions();
 
   return (
-    <main>
-      <h1>aieye</h1>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div className="app">
+      <div className="header">
+        👁 aieye
+        {sessions && <span className="count">{sessions.length}</span>}
+      </div>
+      {error && <div className="error">{error}</div>}
+      {sessions === null && !error && <div className="empty">Scanning…</div>}
+      {sessions && <SessionList sessions={sessions} />}
+    </div>
   );
 }
-
-export default App;
