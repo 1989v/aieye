@@ -5,6 +5,9 @@ use tauri::{
 };
 use tracing::info;
 
+#[cfg(target_os = "macos")]
+use crate::macos_panel;
+
 pub fn build_tray(app: &App) -> tauri::Result<()> {
     let quit_item = MenuItem::with_id(app, "quit", "Quit aieye", true, Some("cmd+q"))?;
     let menu = Menu::with_items(app, &[&quit_item])?;
@@ -34,16 +37,19 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                     if is_vis {
                         let _ = win.hide();
                     } else {
-                        // full-screen 앱 위에도 올라오도록 모든 Space + fullScreenAuxiliary
-                        let _ = win.set_visible_on_all_workspaces(true);
-                        let _ = win.set_always_on_top(true);
-
                         // 트레이 아이콘 아래쪽으로 패널 위치
                         let scale = win.scale_factor().unwrap_or(1.0);
                         let x = position.x / scale - 180.0; // 360 wide / 2
                         let y = position.y / scale + 6.0;
                         let _ = win.set_position(LogicalPosition::new(x, y));
                         let _ = win.show();
+
+                        // NSPanel 로 변환은 setup 에서 했지만, show() 가 level 을
+                        // 리셋할 수 있으니 매번 재적용 (full-screen 앱 위 보장)
+                        #[cfg(target_os = "macos")]
+                        if let Ok(ns) = win.ns_window() {
+                            macos_panel::elevate_to_panel(ns);
+                        }
                         let _ = win.set_focus();
                     }
                 } else {
