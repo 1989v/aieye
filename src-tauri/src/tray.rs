@@ -13,6 +13,21 @@ use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 #[cfg(target_os = "macos")]
 use tauri_nspanel::ManagerExt;
 
+/// Tauri 의 Rect (position: Position enum, size: Size enum) 에서
+/// physical pixel 좌표 4개를 추출.
+fn extract_rect(rect: &tauri::Rect) -> (f64, f64, f64, f64) {
+    use tauri::{Position, Size};
+    let (x, y) = match &rect.position {
+        Position::Physical(p) => (p.x as f64, p.y as f64),
+        Position::Logical(p) => (p.x, p.y),
+    };
+    let (w, h) = match &rect.size {
+        Size::Physical(s) => (s.width as f64, s.height as f64),
+        Size::Logical(s) => (s.width, s.height),
+    };
+    (x, y, w, h)
+}
+
 pub fn build_tray(app: &App) -> tauri::Result<()> {
     let quit_item = MenuItem::with_id(app, "quit", "Quit aieye", true, Some("cmd+q"))?;
     let menu = Menu::with_items(app, &[&quit_item])?;
@@ -30,7 +45,7 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
-                position,
+                rect,
                 ..
             } = event
             {
@@ -44,12 +59,17 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                                 panel.order_out(None);
                             } else {
                                 if let Some(win) = app.get_webview_window("panel") {
-                                    let scale = win.scale_factor().unwrap_or(1.0);
-                                    let x = position.x / scale - 180.0;
-                                    let y = position.y / scale + 6.0;
+                                    let scale = win.scale_factor().unwrap_or(2.0);
+                                    // tray icon 의 rect → 메뉴바 하단 경계 기준으로 panel 위치
+                                    let (tx, ty, tw, th) = extract_rect(&rect);
+                                    let center_x = (tx + tw / 2.0) / scale;
+                                    let bottom_y = (ty + th) / scale;
+                                    const PANEL_W: f64 = 360.0;
+                                    const GAP: f64 = 4.0;
+                                    let x = center_x - PANEL_W / 2.0;
+                                    let y = bottom_y + GAP;
                                     let _ = win.set_position(LogicalPosition::new(x, y));
                                 }
-                                // 매 show 마다 level/collection 재적용
                                 panel.set_level(25);
                                 panel.set_collection_behaviour(
                                     NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces

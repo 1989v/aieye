@@ -29,24 +29,33 @@ pub fn run() {
             {
                 use tauri::Manager;
                 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
-                use tauri_nspanel::WebviewWindowExt;
+                use tauri_nspanel::{panel_delegate, WebviewWindowExt};
                 if let Some(win) = app.get_webview_window("panel") {
                     match win.to_panel() {
                         Ok(panel) => {
                             tracing::info!("panel window converted to NSPanel");
 
-                            // NSWindowStyleMaskNonactivatingPanel (1 << 7)
-                            panel.set_style_mask(1 << 7);
-                            // statusBar level — full-screen 앱 위
-                            panel.set_level(25);
-                            // canJoinAllSpaces | fullScreenAuxiliary | stationary
+                            panel.set_style_mask(1 << 7); // NSNonactivatingPanel
+                            panel.set_level(25);          // statusBar level
                             panel.set_collection_behaviour(
                                 NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
                                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
                                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
                             );
 
-                            tracing::info!("panel: style/level/collectionBehaviour set");
+                            // 외부 클릭 시 자동 닫힘 (포커스 잃으면 order_out)
+                            let panel_for_delegate = panel.clone();
+                            let delegate = panel_delegate!(AieyePanelDelegate {
+                                window_did_resign_key
+                            });
+                            delegate.set_listener(Box::new(move |name: String| {
+                                if name == "window_did_resign_key" {
+                                    panel_for_delegate.order_out(None);
+                                }
+                            }));
+                            panel.set_delegate(delegate);
+
+                            tracing::info!("panel: style/level/behaviour/delegate set");
                         }
                         Err(e) => {
                             tracing::error!("to_panel failed: {e:?}");
