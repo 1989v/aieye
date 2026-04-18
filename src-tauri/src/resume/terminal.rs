@@ -95,6 +95,82 @@ fn run_osascript(script: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 주어진 tty 와 매칭되는 탭/세션을 Terminal.app 또는 iTerm2 에서 찾아 activate.
+/// 매칭 실패하면 Err. 매칭된 후 해당 터미널 앱이 frontmost 가 됨.
+pub fn focus_existing_tab(app: TerminalApp, tty: &str) -> anyhow::Result<()> {
+    match app {
+        TerminalApp::Terminal => focus_terminal_tab(tty),
+        TerminalApp::Iterm2 => focus_iterm_session(tty),
+        _ => anyhow::bail!("focus_existing_tab only supports Terminal/iTerm2"),
+    }
+}
+
+/// 단순히 앱을 frontmost 로만 올림 (IDE 용).
+pub fn activate_app(app_name: &str) -> anyhow::Result<()> {
+    let script = format!(
+        "tell application \"{}\" to activate",
+        escape_applescript(app_name)
+    );
+    run_osascript(&script)
+}
+
+fn focus_terminal_tab(tty: &str) -> anyhow::Result<()> {
+    // Terminal.app 은 tab 의 tty 프로퍼티 제공 (예 "/dev/ttys003")
+    let script = format!(
+        r#"
+tell application "Terminal"
+    set found to false
+    repeat with w in windows
+        repeat with t in tabs of w
+            if tty of t is "{tty_escaped}" then
+                set selected tab of w to t
+                set index of w to 1
+                set found to true
+                exit repeat
+            end if
+        end repeat
+        if found then exit repeat
+    end repeat
+    activate
+    if not found then error "tab not found"
+end tell
+"#,
+        tty_escaped = escape_applescript(tty)
+    );
+    run_osascript(&script)
+}
+
+fn focus_iterm_session(tty: &str) -> anyhow::Result<()> {
+    // iTerm2 는 session 단위 tty. window.select(tab) + session.select
+    let script = format!(
+        r#"
+tell application "iTerm"
+    set found to false
+    repeat with w in windows
+        repeat with t in tabs of w
+            repeat with s in sessions of t
+                if tty of s is "{tty_escaped}" then
+                    tell w
+                        select t
+                    end tell
+                    select s
+                    set found to true
+                    exit repeat
+                end if
+            end repeat
+            if found then exit repeat
+        end repeat
+        if found then exit repeat
+    end repeat
+    activate
+    if not found then error "session not found"
+end tell
+"#,
+        tty_escaped = escape_applescript(tty)
+    );
+    run_osascript(&script)
+}
+
 fn escape_applescript(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
