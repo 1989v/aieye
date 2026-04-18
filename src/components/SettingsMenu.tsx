@@ -6,7 +6,6 @@ import { listInstalledTerminals } from "../ipc/tauri";
 const LABELS: Record<TerminalApp, string> = {
   terminal: "Terminal",
   iterm2: "iTerm2",
-  warp: "Warp",
   alacritty: "Alacritty",
   kitty: "kitty",
 };

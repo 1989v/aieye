@@ -1,13 +1,11 @@
 use serde::{Deserialize, Serialize};
-use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TerminalApp {
     Terminal,
     Iterm2,
-    Warp,
     Alacritty,
     Kitty,
 }
@@ -17,7 +15,6 @@ impl TerminalApp {
         &[
             TerminalApp::Terminal,
             TerminalApp::Iterm2,
-            TerminalApp::Warp,
             TerminalApp::Alacritty,
             TerminalApp::Kitty,
         ]
@@ -27,7 +24,6 @@ impl TerminalApp {
         match self {
             TerminalApp::Terminal => "com.apple.Terminal",
             TerminalApp::Iterm2 => "com.googlecode.iterm2",
-            TerminalApp::Warp => "dev.warp.Warp-Stable",
             TerminalApp::Alacritty => "org.alacritty",
             TerminalApp::Kitty => "net.kovidgoyal.kitty",
         }
@@ -55,7 +51,6 @@ pub fn launch_in_terminal(app: TerminalApp, shell_command: &str) -> anyhow::Resu
     match app {
         TerminalApp::Terminal => launch_terminal_app(shell_command),
         TerminalApp::Iterm2 => launch_iterm2(shell_command),
-        TerminalApp::Warp => launch_warp(shell_command),
         TerminalApp::Alacritty => launch_direct_binary(
             "/Applications/Alacritty.app/Contents/MacOS/alacritty",
             &["-e", "bash", "-c", shell_command],
@@ -83,37 +78,6 @@ fn launch_iterm2(cmd: &str) -> anyhow::Result<()> {
     run_osascript(&script)
 }
 
-/// Warp: URL scheme 이 command 파라미터를 실행 안 시켜서 키스트로크 대안 사용.
-/// 방식:
-///   1. 명령어를 pbcopy 로 클립보드 복사
-///   2. Warp 활성화 + 새 탭 열기 (cmd+T) + 붙여넣기 (cmd+V) + Enter
-/// Accessibility 권한 필요 (시스템 설정 → 손쉬운 사용 → aieye 허용).
-fn launch_warp(shell_command: &str) -> anyhow::Result<()> {
-    copy_to_clipboard(shell_command)?;
-
-    let script = "\
-tell application \"Warp\" to activate
-delay 0.6
-tell application \"System Events\"
-  keystroke \"t\" using command down
-  delay 0.3
-  keystroke \"v\" using command down
-  delay 0.15
-  key code 36
-end tell
-";
-    run_osascript(script)
-}
-
-fn copy_to_clipboard(text: &str) -> anyhow::Result<()> {
-    let mut child = Command::new("pbcopy").stdin(Stdio::piped()).spawn()?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(text.as_bytes())?;
-    }
-    child.wait()?;
-    Ok(())
-}
-
 fn launch_direct_binary(bin: &str, args: &[&str]) -> anyhow::Result<()> {
     if !std::path::Path::new(bin).exists() {
         anyhow::bail!("{bin} not found — 해당 터미널 앱이 설치됐는지 확인");
@@ -124,16 +88,9 @@ fn launch_direct_binary(bin: &str, args: &[&str]) -> anyhow::Result<()> {
 
 fn run_osascript(script: &str) -> anyhow::Result<()> {
     let output = Command::new("osascript").args(["-e", script]).output()?;
-    let stderr = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
         anyhow::bail!("osascript failed: {stderr}");
-    }
-    // macOS 는 Accessibility 거부 시 exit 0 인데 stderr 에 -1743 / "not allowed" 반환
-    if stderr.contains("-1743") || stderr.contains("not allowed") {
-        anyhow::bail!(
-            "System Events access denied — grant Accessibility to aieye in System Settings: {}",
-            stderr.trim()
-        );
     }
     Ok(())
 }

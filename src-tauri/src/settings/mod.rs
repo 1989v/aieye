@@ -14,9 +14,10 @@ pub fn load() -> Settings {
     if !path.exists() {
         return Settings::default();
     }
+    // 과거 버전에서 preferred_terminal 이 "warp" 등 제거된 값일 수 있음 → 무효시 default
     std::fs::read_to_string(&path)
         .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
+        .and_then(|s| serde_json::from_str::<Settings>(&s).ok())
         .unwrap_or_default()
 }
 
