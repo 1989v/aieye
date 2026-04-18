@@ -4,6 +4,15 @@ export type SessionState = "running" | "recent" | "stale";
 
 export type TerminalApp = "terminal" | "iterm2" | "alacritty" | "kitty";
 
+export type HostKind = "terminal" | "iterm2" | "vscode" | "jetbrains" | "other";
+
+export interface RunningInfo {
+  pid: number;
+  tty: string;
+  host_kind: HostKind;
+  host_name: string | null;
+}
+
 export interface Session {
   id: string;
   cli: CliKind;
@@ -14,4 +23,5 @@ export interface Session {
   last_activity: string;
   message_count: number | null;
   state: SessionState;
+  running?: RunningInfo | null;
 }

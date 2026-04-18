@@ -113,6 +113,13 @@ body,
   white-space: nowrap;
 }
 
+.session-row .running-badge {
+  font-size: 11px;
+  color: #7ee787;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
 .session-row .sub {
   font-size: 11px;
   color: #888;

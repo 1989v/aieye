@@ -1,6 +1,6 @@
 use crate::resume::{
     activate_app, find_running, focus_existing_tab, launch_in_terminal, resume_shell_command,
-    HostApp, TerminalApp,
+    HostApp, RunningInfo, TerminalApp,
 };
 use crate::sessions::{CliKind, Session, SessionCoordinator};
 use crate::settings::{self, Settings};
@@ -8,7 +8,32 @@ use crate::settings::{self, Settings};
 #[tauri::command]
 pub async fn list_sessions() -> Result<Vec<Session>, String> {
     let coord = SessionCoordinator::with_defaults();
-    Ok(coord.scan_all().await)
+    let mut sessions = coord.scan_all().await;
+    for s in &mut sessions {
+        let Some(cwd) = s.project_path.as_deref() else { continue };
+        let cli_name = match s.cli {
+            CliKind::Claude => "claude",
+            CliKind::Codex => "codex",
+        };
+        if let Some(r) = find_running(cli_name, cwd) {
+            s.running = Some(RunningInfo::from(&r));
+        }
+    }
+    Ok(sessions)
+}
+
+fn copy_to_clipboard(text: &str) {
+    use std::io::Write;
+    let Ok(mut child) = std::process::Command::new("pbcopy")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    else {
+        return;
+    };
+    if let Some(stdin) = child.stdin.as_mut() {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    let _ = child.wait();
 }
 
 #[tauri::command]
@@ -35,19 +60,20 @@ pub async fn resume_session(
                 HostApp::Iterm2 => focus_existing_tab(TerminalApp::Iterm2, &running.tty)
                     .map_err(|e| e.to_string()),
                 HostApp::VsCode | HostApp::Jetbrains => {
-                    // 실제 번들 이름 우선 (Cursor, WebStorm, PyCharm 등 정확히 activate)
+                    // IDE 내부 터미널 탭은 AppleScript 로 선택 불가 → tty 를
+                    // 클립보드에 복사해서 사용자가 직접 탭 찾기 쉽게 함.
+                    copy_to_clipboard(&running.tty);
+                    tracing::info!("tty {} copied to clipboard", running.tty);
                     if let Some(name) = running.host_app_name.as_deref() {
                         if activate_app(name).is_ok() {
                             return Ok(());
                         }
                     }
-                    // 번들 이름 없거나 실패 시 enum 대표 이름 시도
                     if let Some(name) = running.host_app.app_name() {
                         if activate_app(name).is_ok() {
                             return Ok(());
                         }
                     }
-                    // 최종 fallback: 새 터미널 런칭
                     launch_new(&session, terminal).map_err(|e| e.to_string())
                 }
                 HostApp::Other => launch_new(&session, terminal).map_err(|e| e.to_string()),

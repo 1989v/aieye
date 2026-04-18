@@ -1,6 +1,7 @@
 //! 현재 실행 중인 claude / codex 프로세스를 찾아 해당 세션이 어느 터미널에
 //! 붙어있는지 판별.
 
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -13,6 +14,33 @@ pub struct RunningSession {
     /// 실제 호스트 앱 bundle 이름 (e.g. "WebStorm", "Cursor").
     /// classify 는 enum 으로 카테고리화하지만 activate 는 정확한 이름이 필요.
     pub host_app_name: Option<String>,
+}
+
+/// 프론트엔드로 노출되는 요약형.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunningInfo {
+    pub pid: u32,
+    pub tty: String,
+    pub host_kind: String,
+    pub host_name: Option<String>,
+}
+
+impl From<&RunningSession> for RunningInfo {
+    fn from(s: &RunningSession) -> Self {
+        let host_kind = match s.host_app {
+            HostApp::Terminal => "terminal",
+            HostApp::Iterm2 => "iterm2",
+            HostApp::VsCode => "vscode",
+            HostApp::Jetbrains => "jetbrains",
+            HostApp::Other => "other",
+        };
+        RunningInfo {
+            pid: s.pid,
+            tty: s.tty.clone(),
+            host_kind: host_kind.to_string(),
+            host_name: s.host_app_name.clone(),
+        }
+    }
 }
 
 /// 터미널/IDE 구분.
@@ -45,38 +73,84 @@ impl HostApp {
 
 /// 주어진 cli (claude/codex) 와 cwd 에 매칭되는 실행 중 프로세스를 찾는다.
 pub fn find_running(cli_name: &str, cwd: &Path) -> Option<RunningSession> {
-    let pids = pgrep(cli_name)?;
+    let pids = pgrep(cli_name).unwrap_or_default();
+    tracing::info!(
+        "find_running: cli={} cwd={} candidates={:?}",
+        cli_name,
+        cwd.display(),
+        pids
+    );
+    if pids.is_empty() {
+        return None;
+    }
+    // 심볼릭 링크 정규화 (예: /tmp → /private/tmp)
+    let target = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
     for pid in pids {
-        if let Some(proc_cwd) = get_process_cwd(pid) {
-            if proc_cwd == cwd {
-                let tty = get_process_tty(pid)?;
-                let (host_app, host_app_name) = detect_host_app(pid);
-                return Some(RunningSession {
-                    pid,
-                    tty,
-                    host_app,
-                    host_app_name,
-                });
+        let proc_cwd = match get_process_cwd(pid) {
+            Some(p) => p,
+            None => {
+                tracing::info!("  pid={} cwd=<none>", pid);
+                continue;
             }
+        };
+        let proc_cwd_canon =
+            std::fs::canonicalize(&proc_cwd).unwrap_or_else(|_| proc_cwd.clone());
+        let matches = proc_cwd_canon == target;
+        tracing::info!(
+            "  pid={} cwd={} match={}",
+            pid,
+            proc_cwd.display(),
+            matches
+        );
+        if matches {
+            let tty = get_process_tty(pid);
+            let (host_app, host_app_name) = detect_host_app(pid);
+            tracing::info!(
+                "  → matched: tty={:?} host_app={:?} bundle={:?}",
+                tty,
+                host_app,
+                host_app_name
+            );
+            // tty 없는 후보는 bg 스크립트 등 — 다음 후보로 넘어감
+            let Some(tty) = tty else { continue };
+            return Some(RunningSession {
+                pid,
+                tty,
+                host_app,
+                host_app_name,
+            });
         }
     }
+    tracing::info!("find_running: no match for cwd={}", target.display());
     None
 }
 
 fn pgrep(name: &str) -> Option<Vec<u32>> {
-    let output = Command::new("pgrep").arg(name).output().ok()?;
-    if !output.status.success() {
-        return None;
+    // 1차: -x 로 argv[0] 이 정확히 name 인 프로세스만 (bg 스크립트의 오탐 방지)
+    let mut pids = run_pgrep(&["-x", name]);
+    // 2차 fallback: -x 로 못 찾으면 node 래퍼 가능성 → `/claude` 나 `/codex` 로 끝나는 경로만 매칭
+    if pids.is_empty() {
+        let pattern = format!("/{name}$");
+        pids = run_pgrep(&["-f", &pattern]);
     }
-    let list: Vec<u32> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter_map(|s| s.trim().parse().ok())
-        .collect();
-    if list.is_empty() {
+    if pids.is_empty() {
         None
     } else {
-        Some(list)
+        Some(pids)
     }
+}
+
+fn run_pgrep(args: &[&str]) -> Vec<u32> {
+    let output = match Command::new("pgrep").args(args).output() {
+        Ok(o) if o.status.success() => o,
+        _ => return Vec::new(),
+    };
+    let self_pid = std::process::id();
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|s| s.trim().parse::<u32>().ok())
+        .filter(|pid| *pid != self_pid)
+        .collect()
 }
 
 fn get_process_cwd(pid: u32) -> Option<PathBuf> {

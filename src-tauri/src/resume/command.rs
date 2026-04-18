@@ -45,6 +45,7 @@ mod tests {
             last_activity: Utc::now(),
             message_count: None,
             state: SessionState::Recent,
+            running: None,
         }
     }
 

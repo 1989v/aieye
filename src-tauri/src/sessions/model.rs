@@ -1,3 +1,4 @@
+use crate::resume::RunningInfo;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -37,4 +38,6 @@ pub struct Session {
     pub last_activity: DateTime<Utc>,
     pub message_count: Option<usize>,
     pub state: SessionState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub running: Option<RunningInfo>,
 }

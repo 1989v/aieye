@@ -62,6 +62,7 @@ impl ClaudeAdapter {
             last_activity: mtime,
             message_count: None,
             state: self.classify(mtime),
+            running: None,
         })
     }
 }

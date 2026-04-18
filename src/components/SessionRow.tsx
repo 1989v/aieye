@@ -14,6 +14,22 @@ function stateDot(state: Session["state"]): string {
   return state === "running" ? "🟢" : state === "recent" ? "🟡" : "🔘";
 }
 
+function hostLabel(r: NonNullable<Session["running"]>): string {
+  const name =
+    r.host_name ??
+    (r.host_kind === "terminal"
+      ? "Terminal"
+      : r.host_kind === "iterm2"
+        ? "iTerm"
+        : r.host_kind === "vscode"
+          ? "VS Code"
+          : r.host_kind === "jetbrains"
+            ? "JetBrains"
+            : "host");
+  const shortTty = r.tty.replace("/dev/", "");
+  return `${name} · ${shortTty}`;
+}
+
 export function SessionRow({ session }: { session: Session }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -33,6 +49,9 @@ export function SessionRow({ session }: { session: Session }) {
           {session.git_branch && <> · {session.git_branch}</>}
           <> · {relativeTime(session.last_activity)}</>
         </div>
+        {session.running && (
+          <div className="running-badge">● live · {hostLabel(session.running)}</div>
+        )}
       </div>
       <button
         className="row-menu-btn"
