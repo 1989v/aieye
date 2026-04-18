@@ -33,11 +33,10 @@ pub fn run() {
                 if let Some(win) = app.get_webview_window("panel") {
                     // 네이티브 popover 스타일: 블러 vibrancy + 둥근 모서리 10pt
                     use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
-                    // SwiftUI MenuBarExtra 는 내부적으로 Menu 머티리얼 사용
-                    // (Popover 머티리얼은 NSPopover 전용, 명도 약간 다름)
+                    // HudWindow — 가장 낮은 명도, muxbar tone 에 근접
                     if let Err(e) = apply_vibrancy(
                         &win,
-                        NSVisualEffectMaterial::Menu,
+                        NSVisualEffectMaterial::HudWindow,
                         Some(NSVisualEffectState::Active),
                         Some(10.0),
                     ) {
