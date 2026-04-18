@@ -15,7 +15,17 @@ pub async fn resume_session(
 ) -> Result<(), String> {
     let cmd = resume_shell_command(&session);
     let term = terminal.unwrap_or_else(|| settings::load().preferred_terminal);
-    launch_in_terminal(term, &cmd).map_err(|e| e.to_string())
+    tracing::info!("resume_session: cli={:?} id={} term={:?} cmd={}", session.cli, session.id, term, cmd);
+    match launch_in_terminal(term, &cmd) {
+        Ok(()) => {
+            tracing::info!("launch_in_terminal ok");
+            Ok(())
+        }
+        Err(e) => {
+            tracing::error!("launch_in_terminal failed: {}", e);
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]

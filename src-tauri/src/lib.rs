@@ -97,6 +97,7 @@ pub fn run() {
                                 window_did_resign_key
                             });
                             delegate.set_listener(Box::new(move |name: String| {
+                                tracing::info!("panel delegate event: {}", name);
                                 if name == "window_did_resign_key" {
                                     panel_for_delegate.order_out(None);
                                 }

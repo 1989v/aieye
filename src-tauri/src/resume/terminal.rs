@@ -27,9 +27,15 @@ pub fn launch_in_terminal(app: TerminalApp, shell_command: &str) -> anyhow::Resu
     match app {
         TerminalApp::Terminal => launch_terminal_app(shell_command),
         TerminalApp::Iterm2 => launch_iterm2(shell_command),
-        TerminalApp::Warp | TerminalApp::Alacritty | TerminalApp::Kitty => {
-            launch_via_open(app, shell_command)
-        }
+        TerminalApp::Warp => launch_warp(shell_command),
+        TerminalApp::Alacritty => launch_direct_binary(
+            "/Applications/Alacritty.app/Contents/MacOS/alacritty",
+            &["-e", "bash", "-c", shell_command],
+        ),
+        TerminalApp::Kitty => launch_direct_binary(
+            "/Applications/kitty.app/Contents/MacOS/kitty",
+            &["-e", "bash", "-c", shell_command],
+        ),
     }
 }
 
@@ -49,22 +55,26 @@ fn launch_iterm2(cmd: &str) -> anyhow::Result<()> {
     run_osascript(&script)
 }
 
-fn launch_via_open(app: TerminalApp, cmd: &str) -> anyhow::Result<()> {
-    let status = Command::new("open")
-        .args([
-            "-na",
-            "-b",
-            app.bundle_id(),
-            "--args",
-            "-e",
-            "bash",
-            "-c",
-            cmd,
-        ])
-        .status()?;
+/// Warp: URL scheme `warp://action/new_tab?path=<p>&command=<c>`.
+/// 값은 URL-encoding.
+fn launch_warp(shell_command: &str) -> anyhow::Result<()> {
+    // shell_command 는 "cd '<cwd>' && claude --resume '<id>'" 형태.
+    // path 는 cwd, command 는 claude 부분만 전달하는 게 Warp UX 에 맞지만,
+    // 단순화를 위해 command 한 덩어리 전체를 넘겨 Warp 가 bash 로 실행하게.
+    let encoded_cmd = url_encode(shell_command);
+    let url = format!("warp://action/new_tab?command={encoded_cmd}");
+    let status = Command::new("open").arg(&url).status()?;
     if !status.success() {
-        anyhow::bail!("open exited with {status:?}");
+        anyhow::bail!("open warp:// exited with {status:?}");
     }
+    Ok(())
+}
+
+fn launch_direct_binary(bin: &str, args: &[&str]) -> anyhow::Result<()> {
+    if !std::path::Path::new(bin).exists() {
+        anyhow::bail!("{bin} not found — 해당 터미널 앱이 설치됐는지 확인");
+    }
+    Command::new(bin).args(args).spawn()?;
     Ok(())
 }
 
@@ -79,4 +89,20 @@ fn run_osascript(script: &str) -> anyhow::Result<()> {
 
 fn escape_applescript(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// RFC3986 기반 간이 URL 인코딩 (unreserved + path-safe 약간).
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            _ => {
+                out.push_str(&format!("%{:02X}", b));
+            }
+        }
+    }
+    out
 }
