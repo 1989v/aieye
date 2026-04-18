@@ -1,0 +1,23 @@
+.DS_Store
+
+# Rust
+target/
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+.vite/
+pnpm-debug.log
+
+# Tauri build artifacts
+src-tauri/target/
+
+# IDE
+.idea/
+.vscode/
+*.xcodeproj/
+
+# build.sh artifacts
+/aieye.app/
+/dist/
