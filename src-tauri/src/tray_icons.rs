@@ -11,6 +11,11 @@
 use image::{ImageBuffer, Rgba, RgbaImage};
 
 const SIZE: u32 = 44;
+/// 트레이 아이콘 기본 색상 (macOS system blue 톤).
+/// alpha 는 원본 유지 (AA 엣지 보존).
+const TINT_R: u8 = 77;
+const TINT_G: u8 = 163;
+const TINT_B: u8 = 255;
 const CX: f32 = 22.0;
 const CY: f32 = 22.0;
 const EYE_HALF_W: f32 = 16.0;
@@ -46,7 +51,8 @@ pub fn generate_all() -> TrayIcons {
         for base in &candidate_dirs {
             if let Some(bytes) = try_load(base, name) {
                 tracing::info!("tray icon loaded from disk: {name}");
-                return Some(bytes);
+                // 불투명 픽셀을 파란색으로 리컬러 (alpha 유지 → AA 보존)
+                return Some(recolor_blue(&bytes).unwrap_or(bytes));
             }
         }
         None
@@ -86,6 +92,25 @@ pub fn generate_all() -> TrayIcons {
         }
     }
     icons
+}
+
+/// PNG 바이트 입력 → 불투명 픽셀 전부를 TINT_* 블루로 치환, alpha 는 보존.
+/// AA 엣지는 원본 alpha 에 의해 자연스럽게 유지됨. 실패 시 원본 유지.
+fn recolor_blue(png: &[u8]) -> Option<Vec<u8>> {
+    let img = image::load_from_memory(png).ok()?;
+    let mut rgba = img.to_rgba8();
+    for p in rgba.pixels_mut() {
+        if p.0[3] > 0 {
+            p.0[0] = TINT_R;
+            p.0[1] = TINT_G;
+            p.0[2] = TINT_B;
+        }
+    }
+    let mut out = Vec::new();
+    rgba
+        .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
+        .ok()?;
+    Some(out)
 }
 
 /// @2x 우선, 없으면 @1x. 둘 다 없으면 None.

@@ -52,7 +52,7 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
     let idle_icon = tauri::image::Image::from_bytes(&icons.idle)?;
     let _tray = TrayIconBuilder::with_id("main")
         .icon(idle_icon)
-        .icon_as_template(true)
+        .icon_as_template(false)
         .menu(&menu)
         .menu_on_left_click(false)
         .on_menu_event(|app, event| {
@@ -284,7 +284,7 @@ fn apply_tray_visual(
                 if let Err(e) = tray.set_icon(Some(img)) {
                     tracing::error!("set_icon failed: {e:?}");
                 }
-                if let Err(e) = tray.set_icon_as_template(true) {
+                if let Err(e) = tray.set_icon_as_template(false) {
                     tracing::error!("set_icon_as_template failed: {e:?}");
                 }
             }
