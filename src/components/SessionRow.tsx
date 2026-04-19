@@ -6,6 +6,7 @@ import {
   resumeSessionForceNew,
   revealInFinder,
 } from "../ipc/tauri";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 function relativeTime(iso: string): string {
   const delta = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -48,6 +49,7 @@ interface Props {
 
 export function SessionRow({ session, onHover }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // 바깥 클릭/focus 이동/ESC/panel blur 시 overflow 메뉴 자동 닫힘
@@ -117,6 +119,18 @@ export function SessionRow({ session, onHover }: Props) {
       >
         ⋯
       </button>
+      <ConfirmDialog
+        open={confirmArchive}
+        title="세션을 휴지통으로 이동"
+        message={`[${session.cli}] ${session.title}\n\n목록에서 사라지며 --resume 으로 재개 불가. Finder 휴지통에서 복구 가능.`}
+        confirmLabel="이동"
+        danger
+        onCancel={() => setConfirmArchive(false)}
+        onConfirm={() => {
+          archiveSessionFile(session.jsonl_path).catch((err) => console.error(err));
+          setConfirmArchive(false);
+        }}
+      />
       {menuOpen && (
         <div className="row-menu" onClick={(e) => e.stopPropagation()}>
           <button
@@ -151,13 +165,7 @@ export function SessionRow({ session, onHover }: Props) {
               data-row-action="menu"
               className="danger"
               onClick={() => {
-                const ok = window.confirm(
-                  `이 세션을 휴지통으로 이동합니다.\n\n[${session.cli}] ${session.title}\n\n목록에서 사라지며 --resume 으로 재개 불가. Finder 휴지통에서 복구 가능.\n\n계속할까요?`,
-                );
-                if (!ok) return;
-                archiveSessionFile(session.jsonl_path).catch((err) =>
-                  console.error(err),
-                );
+                setConfirmArchive(true);
                 setMenuOpen(false);
               }}
             >
