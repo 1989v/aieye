@@ -14,6 +14,9 @@ pub struct RunningSession {
     /// 실제 호스트 앱 bundle 이름 (e.g. "WebStorm", "Cursor").
     /// classify 는 enum 으로 카테고리화하지만 activate 는 정확한 이름이 필요.
     pub host_app_name: Option<String>,
+    /// 프로세스의 정규화된 cwd — snapshot → 세션 매칭 용도.
+    #[allow(dead_code)]
+    pub cwd: PathBuf,
 }
 
 /// 프론트엔드로 노출되는 요약형.
@@ -71,6 +74,44 @@ impl HostApp {
     }
 }
 
+/// 한 cli 의 모든 실행 중 후보를 미리 수집. 대량 세션 enrich 시 pgrep/lsof
+/// 호출을 세션 수가 아닌 후보 프로세스 수로 제한한다.
+pub fn snapshot_running(cli_name: &str) -> Vec<RunningSession> {
+    let pids = pgrep(cli_name).unwrap_or_default();
+    tracing::info!(
+        "snapshot_running: cli={} candidates={:?}",
+        cli_name,
+        pids
+    );
+    let mut out = Vec::new();
+    for pid in pids {
+        let Some(proc_cwd) = get_process_cwd(pid) else {
+            continue;
+        };
+        let Some(tty) = get_process_tty(pid) else {
+            continue;
+        };
+        let (host_app, host_app_name) = detect_host_app(pid);
+        out.push(RunningSession {
+            pid,
+            tty,
+            host_app,
+            host_app_name,
+            cwd: std::fs::canonicalize(&proc_cwd).unwrap_or(proc_cwd),
+        });
+    }
+    out
+}
+
+/// snapshot 결과에서 주어진 cwd 와 매칭되는 세션을 찾음.
+pub fn match_running<'a>(
+    snapshot: &'a [RunningSession],
+    cwd: &Path,
+) -> Option<&'a RunningSession> {
+    let target = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    snapshot.iter().find(|s| s.cwd == target)
+}
+
 /// 주어진 cli (claude/codex) 와 cwd 에 매칭되는 실행 중 프로세스를 찾는다.
 pub fn find_running(cli_name: &str, cwd: &Path) -> Option<RunningSession> {
     let pids = pgrep(cli_name).unwrap_or_default();
@@ -118,6 +159,7 @@ pub fn find_running(cli_name: &str, cwd: &Path) -> Option<RunningSession> {
                 tty,
                 host_app,
                 host_app_name,
+                cwd: proc_cwd_canon,
             });
         }
     }

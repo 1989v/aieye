@@ -10,6 +10,13 @@ export async function resumeSession(session: Session, terminal?: TerminalApp): P
   await invoke("resume_session", { session, terminal });
 }
 
+export async function resumeSessionForceNew(
+  session: Session,
+  terminal?: TerminalApp,
+): Promise<void> {
+  await invoke("resume_session_force_new", { session, terminal });
+}
+
 export async function revealInFinder(path: string): Promise<void> {
   await invoke("reveal_in_finder", { path });
 }

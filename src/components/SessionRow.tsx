@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Session } from "../types/session";
-import { resumeSession, revealInFinder } from "../ipc/tauri";
+import { resumeSession, resumeSessionForceNew, revealInFinder } from "../ipc/tauri";
 
 function relativeTime(iso: string): string {
   const delta = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -73,6 +73,15 @@ export function SessionRow({ session }: { session: Session }) {
             }}
           >
             Reveal in Finder
+          </button>
+          <button
+            data-row-action="menu"
+            onClick={() => {
+              resumeSessionForceNew(session).catch((err) => console.error(err));
+              setMenuOpen(false);
+            }}
+          >
+            Open in new terminal
           </button>
           <button
             data-row-action="menu"

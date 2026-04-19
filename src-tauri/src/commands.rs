@@ -1,6 +1,6 @@
 use crate::resume::{
-    activate_app, find_running, focus_existing_tab, launch_in_terminal, resume_shell_command,
-    HostApp, RunningInfo, TerminalApp,
+    activate_app, find_running, focus_existing_tab, launch_in_terminal, match_running,
+    resume_shell_command, snapshot_running, HostApp, RunningInfo, TerminalApp,
 };
 use crate::sessions::{CliKind, Session, SessionCoordinator};
 use crate::settings::{self, Settings};
@@ -9,14 +9,18 @@ use crate::settings::{self, Settings};
 pub async fn list_sessions() -> Result<Vec<Session>, String> {
     let coord = SessionCoordinator::with_defaults();
     let mut sessions = coord.scan_all().await;
+    // pgrep/lsof/ps 를 세션마다 호출하면 N회 — 대신 cli 당 1회 snapshot 후
+    // 세션 루프에선 cwd 매칭만 수행.
+    let claude_snap = snapshot_running("claude");
+    let codex_snap = snapshot_running("codex");
     for s in &mut sessions {
         let Some(cwd) = s.project_path.as_deref() else { continue };
-        let cli_name = match s.cli {
-            CliKind::Claude => "claude",
-            CliKind::Codex => "codex",
+        let snap = match s.cli {
+            CliKind::Claude => &claude_snap,
+            CliKind::Codex => &codex_snap,
         };
-        if let Some(r) = find_running(cli_name, cwd) {
-            s.running = Some(RunningInfo::from(&r));
+        if let Some(r) = match_running(snap, cwd) {
+            s.running = Some(RunningInfo::from(r));
         }
     }
     Ok(sessions)
@@ -82,6 +86,14 @@ pub async fn resume_session(
     }
 
     // 2. 실행 중이 아니면 새 터미널 런칭
+    launch_new(&session, terminal).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn resume_session_force_new(
+    session: Session,
+    terminal: Option<TerminalApp>,
+) -> Result<(), String> {
     launch_new(&session, terminal).map_err(|e| e.to_string())
 }
 
