@@ -47,3 +47,13 @@ export async function getSessionPreview(
 export async function archiveSessionFile(jsonlPath: string): Promise<void> {
   await invoke("archive_session_file", { jsonlPath });
 }
+
+export interface BulkArchiveResult {
+  archived: string[];
+  skipped_recent: string[];
+  errors: string[];
+}
+
+export async function archiveSessionsBulk(paths: string[]): Promise<BulkArchiveResult> {
+  return invoke<BulkArchiveResult>("archive_sessions_bulk", { paths });
+}

@@ -47,7 +47,7 @@ export function ConfirmDialog({
         <div className="confirm-title">{title}</div>
         <div className="confirm-message">{message}</div>
         <div className="confirm-actions">
-          <button onClick={onCancel}>{cancelLabel}</button>
+          {cancelLabel && <button onClick={onCancel}>{cancelLabel}</button>}
           <button
             ref={confirmRef}
             className={danger ? "danger" : "primary"}

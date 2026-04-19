@@ -45,9 +45,20 @@ function hostLabel(r: NonNullable<Session["running"]>): string {
 interface Props {
   session: Session;
   onHover?: (session: Session | null) => void;
+  manageMode?: boolean;
+  selected?: boolean;
+  eligible?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-export function SessionRow({ session, onHover }: Props) {
+export function SessionRow({
+  session,
+  onHover,
+  manageMode,
+  selected,
+  eligible,
+  onToggleSelect,
+}: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -75,6 +86,10 @@ export function SessionRow({ session, onHover }: Props) {
 
   const onClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).dataset.rowAction) return;
+    if (manageMode) {
+      if (eligible) onToggleSelect?.(session.id);
+      return;
+    }
     resumeSession(session).catch((err) => console.error(err));
   };
 
@@ -82,13 +97,34 @@ export function SessionRow({ session, onHover }: Props) {
   const lastUser = preview?.last_user?.trim();
   const lastAssistant = preview?.last_assistant?.trim();
 
+  const rowClass = [
+    "session-row",
+    manageMode ? "manage" : "",
+    manageMode && !eligible ? "protected" : "",
+    selected ? "selected" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
-      className="session-row"
+      className={rowClass}
       onClick={onClick}
       onMouseEnter={() => onHover?.(session)}
       ref={rootRef}
     >
+      {manageMode && (
+        <input
+          type="checkbox"
+          className="manage-checkbox"
+          data-row-action="checkbox"
+          checked={!!selected}
+          disabled={!eligible}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => eligible && onToggleSelect?.(session.id)}
+          title={eligible ? "선택" : "최근 7일 이내 — 보호됨"}
+        />
+      )}
       <span className="state">{stateDot(session.state)}</span>
       <span className="cli">[{session.cli}]</span>
       <div className="body">

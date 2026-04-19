@@ -69,13 +69,17 @@ pub fn get_session_preview(jsonl_path: String, cli: CliKind) -> SessionPreview {
 /// 하드 삭제 대신 Finder 의 move-to-trash 사용 → 실수 시 복원 가능.
 #[tauri::command]
 pub fn archive_session_file(jsonl_path: String) -> Result<(), String> {
-    let path = PathBuf::from(&jsonl_path);
-    if !path.exists() {
+    move_to_trash(&jsonl_path)
+}
+
+fn move_to_trash(path: &str) -> Result<(), String> {
+    let p = PathBuf::from(path);
+    if !p.exists() {
         return Err("file not found".into());
     }
     let script = format!(
         r#"tell application "Finder" to delete POSIX file "{}""#,
-        jsonl_path.replace('\\', "\\\\").replace('"', "\\\"")
+        path.replace('\\', "\\\\").replace('"', "\\\"")
     );
     let output = std::process::Command::new("osascript")
         .args(["-e", &script])
@@ -87,8 +91,61 @@ pub fn archive_session_file(jsonl_path: String) -> Result<(), String> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    tracing::info!("archived to trash: {jsonl_path}");
+    tracing::info!("archived to trash: {path}");
     Ok(())
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BulkArchiveResult {
+    pub archived: Vec<String>,
+    pub skipped_recent: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+/// 여러 세션 파일을 일괄 휴지통 이동. 7일 이내 수정된 파일은 백엔드 안전장치로
+/// 무조건 skip (프론트 필터와 이중 방어).
+#[tauri::command]
+pub fn archive_sessions_bulk(paths: Vec<String>) -> BulkArchiveResult {
+    use std::time::{Duration, SystemTime};
+    const SAFETY_WINDOW: Duration = Duration::from_secs(60 * 60 * 24 * 7);
+
+    let mut result = BulkArchiveResult {
+        archived: Vec::new(),
+        skipped_recent: Vec::new(),
+        errors: Vec::new(),
+    };
+
+    for path in paths {
+        let p = PathBuf::from(&path);
+        let md = match std::fs::metadata(&p) {
+            Ok(m) => m,
+            Err(e) => {
+                result.errors.push(format!("{path}: {e}"));
+                continue;
+            }
+        };
+        let fresh = md
+            .modified()
+            .ok()
+            .and_then(|m| SystemTime::now().duration_since(m).ok())
+            .map(|d| d < SAFETY_WINDOW)
+            .unwrap_or(false);
+        if fresh {
+            result.skipped_recent.push(path);
+            continue;
+        }
+        match move_to_trash(&path) {
+            Ok(()) => result.archived.push(path),
+            Err(e) => result.errors.push(format!("{path}: {e}")),
+        }
+    }
+    tracing::info!(
+        "bulk archive: {} archived, {} skipped_recent, {} errors",
+        result.archived.len(),
+        result.skipped_recent.len(),
+        result.errors.len()
+    );
+    result
 }
 
 #[tauri::command]
