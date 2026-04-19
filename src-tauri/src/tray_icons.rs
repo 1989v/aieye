@@ -15,11 +15,22 @@ pub struct TrayIcons {
 }
 
 pub fn generate_all() -> TrayIcons {
-    TrayIcons {
+    let icons = TrayIcons {
         idle: render_png(draw_idle()),
         finished: render_png(draw_finished()),
         generating: (0..6).map(|i| render_png(draw_generating(i))).collect(),
+    };
+    // 디버그: 생성된 프레임을 디스크에 덤프 → /tmp/aieye-icons/
+    if let Some(dir) = std::env::var_os("AIEYE_DUMP_ICONS") {
+        let d = std::path::PathBuf::from(dir);
+        let _ = std::fs::create_dir_all(&d);
+        let _ = std::fs::write(d.join("idle.png"), &icons.idle);
+        let _ = std::fs::write(d.join("finished.png"), &icons.finished);
+        for (i, png) in icons.generating.iter().enumerate() {
+            let _ = std::fs::write(d.join(format!("gen-{i}.png")), png);
+        }
     }
+    icons
 }
 
 fn render_png(img: RgbaImage) -> Vec<u8> {

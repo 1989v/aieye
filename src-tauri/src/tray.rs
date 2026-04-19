@@ -254,23 +254,43 @@ fn apply_tray_visual(
     finished: u32,
     frame_idx: &AtomicU32,
 ) {
-    let Some(tray) = app.tray_by_id("main") else { return };
     let Some(icons) = app.try_state::<Arc<TrayIcons>>() else { return };
 
+    let frame = (frame_idx.load(Ordering::Relaxed) as usize) % icons.generating.len();
     let (icon_bytes, title) = if generating > 0 {
-        let frame = (frame_idx.load(Ordering::Relaxed) as usize) % icons.generating.len();
-        (&icons.generating[frame], format!(" {}", generating))
+        (icons.generating[frame].clone(), format!(" {}", generating))
     } else if finished > 0 {
-        (&icons.finished, format!(" {}", finished))
+        (icons.finished.clone(), format!(" {}", finished))
     } else {
-        (&icons.idle, String::new())
+        (icons.idle.clone(), String::new())
     };
 
-    if let Ok(img) = tauri::image::Image::from_bytes(icon_bytes) {
-        let _ = tray.set_icon(Some(img));
-        let _ = tray.set_icon_as_template(true);
-    }
-    let _ = tray.set_title(Some(title));
+    // macOS tray UI 는 main thread 에서만 실제 반영됨. background tokio 태스크
+    // 에서 직접 set_icon 호출하면 API 는 Ok 반환해도 시각적으로 변화 없음.
+    let app_main = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Some(tray) = app_main.tray_by_id("main") else { return };
+        match tauri::image::Image::from_bytes(&icon_bytes) {
+            Ok(img) => {
+                if let Err(e) = tray.set_icon(Some(img)) {
+                    tracing::error!("set_icon failed: {e:?}");
+                }
+                if let Err(e) = tray.set_icon_as_template(true) {
+                    tracing::error!("set_icon_as_template failed: {e:?}");
+                }
+            }
+            Err(e) => tracing::error!("Image::from_bytes failed: {e:?}"),
+        }
+        if let Err(e) = tray.set_title(Some(&title)) {
+            tracing::error!("set_title failed: {e:?}");
+        }
+    });
+    tracing::debug!(
+        "tray visual request: gen={} fin={} frame={}",
+        generating,
+        finished,
+        frame
+    );
 }
 
 #[allow(dead_code)]
