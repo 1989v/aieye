@@ -3,6 +3,14 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SessionPreviewInline {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_user: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_assistant: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CliKind {
@@ -43,4 +51,7 @@ pub struct Session {
     /// 직전 응답이 완료되어 사용자가 아직 확인하지 않은 세션인지.
     #[serde(default)]
     pub finished: bool,
+    /// 행 아래 1줄 요약 (C).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inline_preview: Option<SessionPreviewInline>,
 }

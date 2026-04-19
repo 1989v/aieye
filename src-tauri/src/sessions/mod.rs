@@ -8,4 +8,4 @@ pub use adapter::SessionAdapter;
 pub use claude::ClaudeAdapter;
 pub use codex::CodexAdapter;
 pub use coordinator::SessionCoordinator;
-pub use model::{CliKind, Session, SessionState};
+pub use model::{CliKind, Session, SessionPreviewInline, SessionState};

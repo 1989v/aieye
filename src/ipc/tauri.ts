@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Session, TerminalApp } from "../types/session";
+import type { CliKind, Session, SessionPreview, TerminalApp } from "../types/session";
 import type { Settings } from "../types/settings";
 
 export async function listSessions(): Promise<Session[]> {
@@ -35,4 +35,11 @@ export async function setSettings(settings: Settings): Promise<void> {
 
 export async function acknowledgeFinished(sessionId: string): Promise<void> {
   await invoke("acknowledge_finished", { sessionId });
+}
+
+export async function getSessionPreview(
+  jsonlPath: string,
+  cli: CliKind,
+): Promise<SessionPreview> {
+  return invoke<SessionPreview>("get_session_preview", { jsonlPath, cli });
 }

@@ -2,9 +2,11 @@ use crate::resume::{
     activate_app, find_running, focus_existing_tab, launch_in_terminal, match_running,
     resume_shell_command, snapshot_running, HostApp, RunningInfo, TerminalApp,
 };
-use crate::sessions::{CliKind, Session, SessionCoordinator};
+use crate::parser::SessionPreview;
+use crate::sessions::{CliKind, Session, SessionCoordinator, SessionPreviewInline};
 use crate::settings::{self, Settings};
 use crate::tray_state::SharedTrayState;
+use std::path::PathBuf;
 use tauri::State;
 
 #[tauri::command]
@@ -39,7 +41,28 @@ pub async fn list_sessions(state: State<'_, SharedTrayState>) -> Result<Vec<Sess
             s.finished = ts.is_finished(&s.id);
         }
     }
+    // C: 행 1줄 요약 - 최근 20 세션만 (테일 256KB 읽기 비용 고려)
+    for s in sessions.iter_mut().take(20) {
+        let p = match s.cli {
+            CliKind::Claude => crate::parser::claude_preview(&s.jsonl_path),
+            CliKind::Codex => crate::parser::codex_preview(&s.jsonl_path),
+        };
+        s.inline_preview = Some(SessionPreviewInline {
+            last_user: p.last_user,
+            last_assistant: p.last_assistant,
+        });
+    }
     Ok(sessions)
+}
+
+/// B: hover 우측 패널용 최근 대화 턴.
+#[tauri::command]
+pub fn get_session_preview(jsonl_path: String, cli: CliKind) -> SessionPreview {
+    let path = PathBuf::from(jsonl_path);
+    match cli {
+        CliKind::Claude => crate::parser::claude_preview(&path),
+        CliKind::Codex => crate::parser::codex_preview(&path),
+    }
 }
 
 #[tauri::command]

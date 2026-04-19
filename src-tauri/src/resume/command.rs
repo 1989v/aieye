@@ -47,6 +47,7 @@ mod tests {
             state: SessionState::Recent,
             running: None,
             finished: false,
+            inline_preview: None,
         }
     }
 

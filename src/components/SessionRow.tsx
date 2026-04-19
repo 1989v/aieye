@@ -36,7 +36,12 @@ function hostLabel(r: NonNullable<Session["running"]>): string {
   return `${name} · ${shortTty}${act}`;
 }
 
-export function SessionRow({ session }: { session: Session }) {
+interface Props {
+  session: Session;
+  onHover?: (session: Session | null) => void;
+}
+
+export function SessionRow({ session, onHover }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const onClick = (e: React.MouseEvent) => {
@@ -44,8 +49,16 @@ export function SessionRow({ session }: { session: Session }) {
     resumeSession(session).catch((err) => console.error(err));
   };
 
+  const preview = session.inline_preview;
+  const lastUser = preview?.last_user?.trim();
+  const lastAssistant = preview?.last_assistant?.trim();
+
   return (
-    <div className="session-row" onClick={onClick}>
+    <div
+      className="session-row"
+      onClick={onClick}
+      onMouseEnter={() => onHover?.(session)}
+    >
       <span className="state">{stateDot(session.state)}</span>
       <span className="cli">[{session.cli}]</span>
       <div className="body">
@@ -58,6 +71,10 @@ export function SessionRow({ session }: { session: Session }) {
           {session.git_branch && <> · {session.git_branch}</>}
           <> · {relativeTime(session.last_activity)}</>
         </div>
+        {lastUser && <div className="inline-preview user">❯ {lastUser}</div>}
+        {lastAssistant && (
+          <div className="inline-preview assistant">↩ {lastAssistant}</div>
+        )}
         {session.running && (
           <div className="running-badge">● live · {hostLabel(session.running)}</div>
         )}

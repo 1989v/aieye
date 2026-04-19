@@ -28,7 +28,8 @@ pub fn run() {
             commands::list_installed_terminals,
             commands::get_settings,
             commands::set_settings,
-            commands::acknowledge_finished
+            commands::acknowledge_finished,
+            commands::get_session_preview
         ]);
 
     #[cfg(target_os = "macos")]

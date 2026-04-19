@@ -90,7 +90,7 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                                     let left_edge = tx / scale;
                                     let right_edge = (tx + tw) / scale;
                                     let bottom_y = (ty + th) / scale;
-                                    const PANEL_W: f64 = 360.0;
+                                    const PANEL_W: f64 = 640.0;
                                     // macOS popover 는 메뉴바와 거의 붙음 (SwiftUI MenuBarExtra 관례)
                                     const GAP: f64 = 0.0;
                                     const EDGE_MARGIN: f64 = 8.0;

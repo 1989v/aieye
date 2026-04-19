@@ -16,6 +16,25 @@ export interface RunningInfo {
   activity?: Activity | null;
 }
 
+export interface SessionPreviewInline {
+  last_user?: string | null;
+  last_assistant?: string | null;
+}
+
+export type TurnRole = "user" | "assistant";
+
+export interface Turn {
+  role: TurnRole;
+  text: string;
+  timestamp?: string | null;
+}
+
+export interface SessionPreview {
+  last_user?: string | null;
+  last_assistant?: string | null;
+  recent_turns: Turn[];
+}
+
 export interface Session {
   id: string;
   cli: CliKind;
@@ -28,4 +47,5 @@ export interface Session {
   state: SessionState;
   running?: RunningInfo | null;
   finished?: boolean;
+  inline_preview?: SessionPreviewInline | null;
 }

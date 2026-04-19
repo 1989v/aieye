@@ -64,6 +64,7 @@ impl ClaudeAdapter {
             state: self.classify(mtime),
             running: None,
             finished: false,
+            inline_preview: None,
         })
     }
 }
