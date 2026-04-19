@@ -27,7 +27,13 @@ function hostLabel(r: NonNullable<Session["running"]>): string {
             ? "JetBrains"
             : "host");
   const shortTty = r.tty.replace("/dev/", "");
-  return `${name} · ${shortTty}`;
+  const act =
+    r.activity === "generating"
+      ? " · generating…"
+      : r.activity === "idle"
+        ? " · idle"
+        : "";
+  return `${name} · ${shortTty}${act}`;
 }
 
 export function SessionRow({ session }: { session: Session }) {

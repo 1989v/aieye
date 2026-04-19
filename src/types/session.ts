@@ -6,11 +6,14 @@ export type TerminalApp = "terminal" | "iterm2" | "alacritty" | "kitty";
 
 export type HostKind = "terminal" | "iterm2" | "vscode" | "jetbrains" | "other";
 
+export type Activity = "generating" | "idle";
+
 export interface RunningInfo {
   pid: number;
   tty: string;
   host_kind: HostKind;
   host_name: string | null;
+  activity?: Activity | null;
 }
 
 export interface Session {

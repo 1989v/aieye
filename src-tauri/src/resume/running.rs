@@ -29,6 +29,9 @@ pub struct RunningInfo {
     pub tty: String,
     pub host_kind: String,
     pub host_name: Option<String>,
+    /// jsonl 마지막 턴 기반 활성 상태 — enrich 단계에서 별도 주입.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activity: Option<crate::parser::Activity>,
 }
 
 impl From<&RunningSession> for RunningInfo {
@@ -45,6 +48,7 @@ impl From<&RunningSession> for RunningInfo {
             tty: s.tty.clone(),
             host_kind: host_kind.to_string(),
             host_name: s.host_app_name.clone(),
+            activity: None,
         }
     }
 }

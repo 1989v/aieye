@@ -20,7 +20,12 @@ pub async fn list_sessions() -> Result<Vec<Session>, String> {
             CliKind::Codex => &codex_snap,
         };
         if let Some(r) = match_running(snap, cwd, &s.id) {
-            s.running = Some(RunningInfo::from(r));
+            let mut info = RunningInfo::from(r);
+            info.activity = Some(match s.cli {
+                CliKind::Claude => crate::parser::claude_activity(&s.jsonl_path),
+                CliKind::Codex => crate::parser::codex_activity(&s.jsonl_path),
+            });
+            s.running = Some(info);
         }
     }
     Ok(sessions)
