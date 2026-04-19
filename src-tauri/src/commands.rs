@@ -19,7 +19,7 @@ pub async fn list_sessions() -> Result<Vec<Session>, String> {
             CliKind::Claude => &claude_snap,
             CliKind::Codex => &codex_snap,
         };
-        if let Some(r) = match_running(snap, cwd) {
+        if let Some(r) = match_running(snap, cwd, &s.id) {
             s.running = Some(RunningInfo::from(r));
         }
     }

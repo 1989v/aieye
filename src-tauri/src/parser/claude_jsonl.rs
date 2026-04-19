@@ -32,11 +32,17 @@ struct RawMessage<'a> {
 }
 
 pub fn read_session_header(path: &Path) -> anyhow::Result<Option<SessionHeader>> {
-    const MAX_LINES: usize = 20;
+    // 첫 user 메시지가 슬래시 커맨드/시스템 리마인더만 담고 있으면 비게 되므로
+    // 유효 제목을 찾을 때까지 최대 60줄까지 스캔.
+    const MAX_LINES: usize = 60;
     const TITLE_LEN: usize = 80;
 
     let file = File::open(path)?;
     let reader = BufReader::new(file);
+
+    let mut fallback_cwd: Option<PathBuf> = None;
+    let mut fallback_branch: Option<String> = None;
+    let mut fallback_ts: Option<DateTime<Utc>> = None;
 
     for (i, line) in reader.lines().enumerate() {
         if i >= MAX_LINES {
@@ -51,34 +57,89 @@ pub fn read_session_header(path: &Path) -> anyhow::Result<Option<SessionHeader>>
             Err(_) => continue,
         };
 
+        let timestamp = raw
+            .timestamp
+            .as_ref()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc));
+
+        // 첫 줄에서 cwd/branch/ts 캐시해두고 유효 title 찾을 때까지 재사용
+        if fallback_cwd.is_none() {
+            fallback_cwd = raw.cwd.clone().map(PathBuf::from);
+            fallback_branch = raw.git_branch.clone();
+            fallback_ts = timestamp;
+        }
+
         if raw.line_type != Some("user") {
             continue;
         }
-        let message = match raw.message {
-            Some(m) => m,
-            None => continue,
-        };
+        let Some(message) = raw.message else { continue };
         if message.role != Some("user") {
             continue;
         }
 
         let content_text = extract_text(&message.content);
-        let title = truncate(&content_text, TITLE_LEN);
-
-        let timestamp = raw
-            .timestamp
-            .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
-            .map(|dt| dt.with_timezone(&Utc));
+        let cleaned = strip_command_meta(&content_text);
+        if cleaned.is_empty() {
+            continue; // 메타만 있는 메시지 — 다음 user 로
+        }
+        let title = truncate(&cleaned, TITLE_LEN);
 
         return Ok(Some(SessionHeader {
             title,
-            cwd: raw.cwd.map(PathBuf::from),
-            git_branch: raw.git_branch,
-            first_timestamp: timestamp,
+            cwd: raw.cwd.map(PathBuf::from).or(fallback_cwd),
+            git_branch: raw.git_branch.or(fallback_branch),
+            first_timestamp: timestamp.or(fallback_ts),
         }));
     }
 
     Ok(None)
+}
+
+/// Claude Code 가 메시지에 심어넣는 메타 블록을 제거.
+/// `<command-name>...</command-name>`, `<command-message>...</command-message>`,
+/// `<command-args>...</command-args>`, `<local-command-stdout>...</local-command-stdout>`,
+/// `<local-command-caveat>...</local-command-caveat>`, `<system-reminder>...</system-reminder>`,
+/// `<user-prompt-submit-hook>...</user-prompt-submit-hook>` 등.
+fn strip_command_meta(s: &str) -> String {
+    const TAGS: &[&str] = &[
+        "command-name",
+        "command-message",
+        "command-args",
+        "local-command-stdout",
+        "local-command-stderr",
+        "local-command-caveat",
+        "system-reminder",
+        "user-prompt-submit-hook",
+    ];
+    let mut out = s.to_string();
+    for tag in TAGS {
+        out = strip_xml_block(&out, tag);
+    }
+    out.trim().to_string()
+}
+
+fn strip_xml_block(s: &str, tag: &str) -> String {
+    let open = format!("<{tag}>");
+    let close = format!("</{tag}>");
+    let mut result = String::with_capacity(s.len());
+    let mut rest = s;
+    loop {
+        let Some(start) = rest.find(&open) else {
+            result.push_str(rest);
+            break;
+        };
+        result.push_str(&rest[..start]);
+        let after = &rest[start + open.len()..];
+        match after.find(&close) {
+            Some(end) => rest = &after[end + close.len()..],
+            None => {
+                // 닫는 태그 없음 → 해당 위치 이후 전부 버림
+                break;
+            }
+        }
+    }
+    result
 }
 
 fn extract_text(content: &Option<serde_json::Value>) -> String {

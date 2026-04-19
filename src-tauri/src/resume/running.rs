@@ -17,6 +17,9 @@ pub struct RunningSession {
     /// 프로세스의 정규화된 cwd — snapshot → 세션 매칭 용도.
     #[allow(dead_code)]
     pub cwd: PathBuf,
+    /// 프로세스가 열고 있는 jsonl 에서 추출한 세션 ID (claude/codex).
+    /// 같은 cwd 에 세션이 여러 개일 때 행을 정확히 1개만 태깅하기 위함.
+    pub session_id: Option<String>,
 }
 
 /// 프론트엔드로 노출되는 요약형.
@@ -92,24 +95,67 @@ pub fn snapshot_running(cli_name: &str) -> Vec<RunningSession> {
             continue;
         };
         let (host_app, host_app_name) = detect_host_app(pid);
+        let session_id = detect_session_id(pid, cli_name);
         out.push(RunningSession {
             pid,
             tty,
             host_app,
             host_app_name,
             cwd: std::fs::canonicalize(&proc_cwd).unwrap_or(proc_cwd),
+            session_id,
         });
     }
     out
 }
 
-/// snapshot 결과에서 주어진 cwd 와 매칭되는 세션을 찾음.
+/// 프로세스가 열고있는 파일 중 jsonl 세션 파일을 찾아 UUID 추출.
+/// claude: ~/.claude/projects/.../<uuid>.jsonl
+/// codex:  ~/.codex/sessions/.../rollout-...-<uuid>.jsonl
+fn detect_session_id(pid: u32, cli_name: &str) -> Option<String> {
+    let output = Command::new("lsof")
+        .args(["-a", "-p", &pid.to_string(), "-Fn"])
+        .output()
+        .ok()?;
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let Some(path) = line.strip_prefix('n') else { continue };
+        if !path.ends_with(".jsonl") {
+            continue;
+        }
+        // claude 세션 경로: /.claude/projects/<slug>/<uuid>.jsonl
+        if cli_name == "claude" && path.contains("/.claude/projects/") {
+            let stem = std::path::Path::new(path).file_stem()?.to_string_lossy();
+            return Some(stem.to_string());
+        }
+        // codex 세션 경로: /.codex/sessions/.../rollout-...-<uuid>.jsonl
+        if cli_name == "codex" && path.contains("/.codex/sessions/") {
+            let stem = std::path::Path::new(path).file_stem()?.to_string_lossy();
+            return Some(extract_codex_id(&stem));
+        }
+    }
+    None
+}
+
+/// codex rollout stem → 마지막 5개 hyphen-block (UUID v7) 추출.
+fn extract_codex_id(stem: &str) -> String {
+    let parts: Vec<&str> = stem.split('-').collect();
+    if parts.len() >= 5 {
+        parts[parts.len() - 5..].join("-")
+    } else {
+        stem.to_string()
+    }
+}
+
+/// snapshot 결과에서 주어진 cwd + session_id 에 매칭되는 세션을 찾음.
+/// session_id 를 알아낸 프로세스만 태깅 대상 (cwd 충돌 방지).
 pub fn match_running<'a>(
     snapshot: &'a [RunningSession],
     cwd: &Path,
+    session_id: &str,
 ) -> Option<&'a RunningSession> {
     let target = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
-    snapshot.iter().find(|s| s.cwd == target)
+    snapshot
+        .iter()
+        .find(|s| s.cwd == target && s.session_id.as_deref() == Some(session_id))
 }
 
 /// 주어진 cli (claude/codex) 와 cwd 에 매칭되는 실행 중 프로세스를 찾는다.
@@ -154,12 +200,14 @@ pub fn find_running(cli_name: &str, cwd: &Path) -> Option<RunningSession> {
             );
             // tty 없는 후보는 bg 스크립트 등 — 다음 후보로 넘어감
             let Some(tty) = tty else { continue };
+            let session_id = detect_session_id(pid, cli_name);
             return Some(RunningSession {
                 pid,
                 tty,
                 host_app,
                 host_app_name,
                 cwd: proc_cwd_canon,
+                session_id,
             });
         }
     }
