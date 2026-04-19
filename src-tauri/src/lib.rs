@@ -29,7 +29,8 @@ pub fn run() {
             commands::get_settings,
             commands::set_settings,
             commands::acknowledge_finished,
-            commands::get_session_preview
+            commands::get_session_preview,
+            commands::terminate_session_process
         ]);
 
     #[cfg(target_os = "macos")]

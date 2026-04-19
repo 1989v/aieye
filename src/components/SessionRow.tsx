@@ -1,6 +1,11 @@
 import { useState } from "react";
 import type { Session } from "../types/session";
-import { resumeSession, resumeSessionForceNew, revealInFinder } from "../ipc/tauri";
+import {
+  resumeSession,
+  resumeSessionForceNew,
+  revealInFinder,
+  terminateSessionProcess,
+} from "../ipc/tauri";
 
 function relativeTime(iso: string): string {
   const delta = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -118,6 +123,24 @@ export function SessionRow({ session, onHover }: Props) {
           >
             Copy session ID
           </button>
+          {session.running?.pid && (
+            <button
+              data-row-action="menu"
+              className="danger"
+              onClick={() => {
+                const pid = session.running?.pid;
+                if (!pid) return;
+                const ok = window.confirm(
+                  `이 세션을 종료합니다.\n\n[${session.cli}] ${session.title}\npid ${pid} 에 SIGTERM 을 보냅니다.\n\n계속할까요?`,
+                );
+                if (!ok) return;
+                terminateSessionProcess(pid).catch((err) => console.error(err));
+                setMenuOpen(false);
+              }}
+            >
+              End session (SIGTERM)
+            </button>
+          )}
         </div>
       )}
     </div>

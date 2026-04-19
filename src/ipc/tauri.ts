@@ -43,3 +43,7 @@ export async function getSessionPreview(
 ): Promise<SessionPreview> {
   return invoke<SessionPreview>("get_session_preview", { jsonlPath, cli });
 }
+
+export async function terminateSessionProcess(pid: number): Promise<void> {
+  await invoke("terminate_session_process", { pid });
+}

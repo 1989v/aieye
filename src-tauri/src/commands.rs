@@ -65,6 +65,21 @@ pub fn get_session_preview(jsonl_path: String, cli: CliKind) -> SessionPreview {
     }
 }
 
+/// 실행 중인 세션 프로세스를 SIGTERM 으로 정상 종료.
+/// Ctrl+C 와 동일하게 claude/codex 가 버퍼 flush 후 깔끔히 exit.
+#[tauri::command]
+pub fn terminate_session_process(pid: u32) -> Result<(), String> {
+    let status = std::process::Command::new("kill")
+        .args(["-TERM", &pid.to_string()])
+        .status()
+        .map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err(format!("kill -TERM {pid} failed"));
+    }
+    tracing::info!("SIGTERM sent to pid={pid}");
+    Ok(())
+}
+
 #[tauri::command]
 pub fn acknowledge_finished(session_id: String, state: State<'_, SharedTrayState>) {
     if let Ok(mut ts) = state.0.lock() {

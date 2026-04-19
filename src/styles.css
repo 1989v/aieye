@@ -297,6 +297,14 @@ body,
   background: rgba(255, 255, 255, 0.08);
 }
 
+.row-menu button.danger {
+  color: #ff6b6b;
+}
+
+.row-menu button.danger:hover {
+  background: rgba(255, 107, 107, 0.15);
+}
+
 .settings-menu {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding: 2px 0 4px 0;
