@@ -13,20 +13,26 @@ pub async fn list_sessions(state: State<'_, SharedTrayState>) -> Result<Vec<Sess
     let mut sessions = coord.scan_all().await;
     let claude_snap = snapshot_running("claude");
     let codex_snap = snapshot_running("codex");
+    // session_id 매칭이 None 인 running 프로세스는 1개만 최근 세션에 태깅 (cwd 충돌 방지)
+    let mut tagged_pids: std::collections::HashSet<u32> = std::collections::HashSet::new();
     for s in &mut sessions {
         let Some(cwd) = s.project_path.as_deref() else { continue };
         let snap = match s.cli {
             CliKind::Claude => &claude_snap,
             CliKind::Codex => &codex_snap,
         };
-        if let Some(r) = match_running(snap, cwd, &s.id) {
-            let mut info = RunningInfo::from(r);
-            info.activity = Some(match s.cli {
-                CliKind::Claude => crate::parser::claude_activity(&s.jsonl_path),
-                CliKind::Codex => crate::parser::codex_activity(&s.jsonl_path),
-            });
-            s.running = Some(info);
+        let r = match_running(snap, cwd, &s.id);
+        let Some(r) = r else { continue };
+        if tagged_pids.contains(&r.pid) {
+            continue;
         }
+        tagged_pids.insert(r.pid);
+        let mut info = RunningInfo::from(r);
+        info.activity = Some(match s.cli {
+            CliKind::Claude => crate::parser::claude_activity(&s.jsonl_path),
+            CliKind::Codex => crate::parser::codex_activity(&s.jsonl_path),
+        });
+        s.running = Some(info);
     }
     if let Ok(ts) = state.0.lock() {
         for s in &mut sessions {

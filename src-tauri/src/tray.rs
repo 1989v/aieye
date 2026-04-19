@@ -183,15 +183,18 @@ async fn poll_once(app: &AppHandle) {
     let codex_snap = snapshot_running("codex");
 
     let mut obs: Vec<SessionObservation> = Vec::new();
+    let mut tagged_pids: std::collections::HashSet<u32> = std::collections::HashSet::new();
     for s in &sessions {
         let Some(cwd) = s.project_path.as_deref() else { continue };
         let snap = match s.cli {
             CliKind::Claude => &claude_snap,
             CliKind::Codex => &codex_snap,
         };
-        if match_running(snap, cwd, &s.id).is_none() {
-            continue; // 프로세스 없는 세션은 관측 대상 아님
+        let Some(r) = match_running(snap, cwd, &s.id) else { continue };
+        if tagged_pids.contains(&r.pid) {
+            continue;
         }
+        tagged_pids.insert(r.pid);
         let activity = match s.cli {
             CliKind::Claude => claude_activity(&s.jsonl_path),
             CliKind::Codex => codex_activity(&s.jsonl_path),
@@ -219,7 +222,13 @@ async fn poll_once(app: &AppHandle) {
         &FRAME_IDX,
     );
 
-    tracing::debug!("poll: {:?}", summary);
+    tracing::info!(
+        "poll: gen={} fin={} gen_ids={:?} fin_ids={:?}",
+        summary.generating_count,
+        summary.finished_count,
+        summary.generating_ids,
+        summary.finished_ids
+    );
 }
 
 /// generating 세션이 있을 때만 200ms 마다 프레임 교체.

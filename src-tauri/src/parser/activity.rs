@@ -39,27 +39,21 @@ fn is_stale(path: &Path) -> bool {
     elapsed > IDLE_THRESHOLD_SECS
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
-enum Role {
-    User,
-    Assistant,
-}
-
-/// Claude Code JSONL → 마지막 user/assistant role 찾기.
+/// Claude Code JSONL → 마지막 "의미있는 턴" 으로 활성 판별.
+/// - 유저 텍스트 턴이 마지막 → Generating (응답 대기)
+/// - assistant tool_use/streaming → Generating (도구 호출 루프 중)
+/// - assistant end_turn → Idle
 pub fn claude_activity(path: &Path) -> Activity {
     if is_stale(path) {
         return Activity::Idle;
     }
-    match last_role_claude(path) {
-        Some(Role::User) => Activity::Generating,
-        _ => Activity::Idle,
-    }
+    last_meaningful_activity_claude(path).unwrap_or(Activity::Idle)
 }
 
-fn last_role_claude(path: &Path) -> Option<Role> {
+fn last_meaningful_activity_claude(path: &Path) -> Option<Activity> {
     let file = File::open(path).ok()?;
     let reader = BufReader::new(file);
-    let mut last: Option<Role> = None;
+    let mut last: Option<Activity> = None;
     for line in reader.lines().map_while(Result::ok) {
         if line.is_empty() {
             continue;
@@ -69,18 +63,48 @@ fn last_role_claude(path: &Path) -> Option<Role> {
             Err(_) => continue,
         };
         let line_type = v.get("type").and_then(|t| t.as_str());
-        let role = v
-            .get("message")
-            .and_then(|m| m.get("role"))
-            .and_then(|r| r.as_str());
-        let role = match (line_type, role) {
-            (Some("user"), Some("user")) => Role::User,
-            (Some("assistant"), Some("assistant")) => Role::Assistant,
-            _ => continue,
+        let message = match v.get("message") {
+            Some(m) => m,
+            None => continue,
         };
-        last = Some(role);
+        let role = message.get("role").and_then(|r| r.as_str());
+        let act = match (line_type, role) {
+            (Some("user"), Some("user")) => {
+                // 진짜 user 텍스트 턴만 카운트 (tool_result 제외)
+                if !is_real_user_message(message.get("content")) {
+                    continue;
+                }
+                Activity::Generating
+            }
+            (Some("assistant"), Some("assistant")) => {
+                // stop_reason 으로 완료 여부 판단
+                let stop_reason = message.get("stop_reason").and_then(|s| s.as_str());
+                match stop_reason {
+                    Some("end_turn") | Some("stop_sequence") => Activity::Idle,
+                    // "tool_use" / null / "max_tokens" 등은 진행중으로 간주
+                    _ => Activity::Generating,
+                }
+            }
+            _ => continue, // system/permission-mode/turn_duration 등
+        };
+        last = Some(act);
     }
     last
+}
+
+fn is_real_user_message(content: Option<&serde_json::Value>) -> bool {
+    match content {
+        Some(serde_json::Value::String(s)) => !s.trim().is_empty(),
+        Some(serde_json::Value::Array(arr)) => arr.iter().any(|item| {
+            item.get("type").and_then(|t| t.as_str()) == Some("text")
+                && item
+                    .get("text")
+                    .and_then(|t| t.as_str())
+                    .map(|t| !t.trim().is_empty())
+                    .unwrap_or(false)
+        }),
+        _ => false,
+    }
 }
 
 /// Codex rollout JSONL → 마지막 response_item 의 role.
@@ -88,16 +112,13 @@ pub fn codex_activity(path: &Path) -> Activity {
     if is_stale(path) {
         return Activity::Idle;
     }
-    match last_role_codex(path) {
-        Some(Role::User) => Activity::Generating,
-        _ => Activity::Idle,
-    }
+    last_role_codex(path).unwrap_or(Activity::Idle)
 }
 
-fn last_role_codex(path: &Path) -> Option<Role> {
+fn last_role_codex(path: &Path) -> Option<Activity> {
     let file = File::open(path).ok()?;
     let reader = BufReader::new(file);
-    let mut last: Option<Role> = None;
+    let mut last: Option<Activity> = None;
     for line in reader.lines().map_while(Result::ok) {
         if line.is_empty() {
             continue;
@@ -117,12 +138,12 @@ fn last_role_codex(path: &Path) -> Option<Role> {
             continue;
         }
         let role = payload.get("role").and_then(|r| r.as_str());
-        let role = match role {
-            Some("user") => Role::User,
-            Some("assistant") => Role::Assistant,
+        let act = match role {
+            Some("user") => Activity::Generating,
+            Some("assistant") => Activity::Idle,
             _ => continue,
         };
-        last = Some(role);
+        last = Some(act);
     }
     last
 }
@@ -131,11 +152,16 @@ fn last_role_codex(path: &Path) -> Option<Role> {
 mod tests {
     use super::*;
 
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
     fn write_tmp(lines: &[&str]) -> std::path::PathBuf {
         let dir = std::env::temp_dir();
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = dir.join(format!(
-            "aieye-activity-test-{}.jsonl",
-            std::process::id()
+            "aieye-activity-test-{}-{}.jsonl",
+            std::process::id(),
+            n
         ));
         std::fs::write(&path, lines.join("\n")).unwrap();
         path
@@ -145,7 +171,7 @@ mod tests {
     fn claude_generating_when_last_is_user() {
         let p = write_tmp(&[
             r#"{"type":"user","message":{"role":"user","content":"hi"}}"#,
-            r#"{"type":"assistant","message":{"role":"assistant","content":"hello"}}"#,
+            r#"{"type":"assistant","message":{"role":"assistant","content":"hello","stop_reason":"end_turn"}}"#,
             r#"{"type":"user","message":{"role":"user","content":"write code"}}"#,
         ]);
         assert_eq!(claude_activity(&p), Activity::Generating);
@@ -153,12 +179,36 @@ mod tests {
     }
 
     #[test]
-    fn claude_idle_when_last_is_assistant() {
+    fn claude_idle_when_assistant_end_turn() {
         let p = write_tmp(&[
             r#"{"type":"user","message":{"role":"user","content":"hi"}}"#,
-            r#"{"type":"assistant","message":{"role":"assistant","content":"hello"}}"#,
+            r#"{"type":"assistant","message":{"role":"assistant","content":"done","stop_reason":"end_turn"}}"#,
         ]);
         assert_eq!(claude_activity(&p), Activity::Idle);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn claude_generating_when_assistant_tool_use() {
+        // 도구 호출 루프 중 — assistant tool_use 가 마지막이라도 진행 중
+        let p = write_tmp(&[
+            r#"{"type":"user","message":{"role":"user","content":"help"}}"#,
+            r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"x"}],"stop_reason":"tool_use"}}"#,
+            r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"x","content":"ok"}]}}"#,
+            r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"y"}],"stop_reason":"tool_use"}}"#,
+        ]);
+        assert_eq!(claude_activity(&p), Activity::Generating);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn claude_system_meta_ignored() {
+        let p = write_tmp(&[
+            r#"{"type":"user","message":{"role":"user","content":"hi"}}"#,
+            r#"{"type":"system","subtype":"turn_duration","durationMs":1000}"#,
+            r#"{"type":"permission-mode","permissionMode":"bypassPermissions","sessionId":"x"}"#,
+        ]);
+        assert_eq!(claude_activity(&p), Activity::Generating);
         let _ = std::fs::remove_file(&p);
     }
 }

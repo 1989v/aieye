@@ -112,29 +112,30 @@ pub fn snapshot_running(cli_name: &str) -> Vec<RunningSession> {
     out
 }
 
-/// 프로세스가 열고있는 파일 중 jsonl 세션 파일을 찾아 UUID 추출.
-/// claude: ~/.claude/projects/.../<uuid>.jsonl
-/// codex:  ~/.codex/sessions/.../rollout-...-<uuid>.jsonl
-fn detect_session_id(pid: u32, cli_name: &str) -> Option<String> {
-    let output = Command::new("lsof")
-        .args(["-a", "-p", &pid.to_string(), "-Fn"])
+/// 프로세스 argv 에서 `--resume <id>` 를 찾아 세션 ID 추출.
+/// claude 는 jsonl 을 연속 open 하지 않아 lsof 로 못 찾음.
+/// - `claude --resume 5a34...` → Some("5a34...")
+/// - `claude` (새 세션) → None → match 단계에서 mtime fallback
+fn detect_session_id(pid: u32, _cli_name: &str) -> Option<String> {
+    let output = Command::new("ps")
+        .args(["-o", "command=", "-p", &pid.to_string()])
         .output()
         .ok()?;
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let Some(path) = line.strip_prefix('n') else { continue };
-        if !path.ends_with(".jsonl") {
-            continue;
+    let cmd = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let tokens: Vec<&str> = cmd.split_whitespace().collect();
+    let mut i = 0;
+    while i < tokens.len() {
+        let t = tokens[i];
+        if t == "--resume" || t == "resume" {
+            if let Some(next) = tokens.get(i + 1) {
+                if !next.starts_with('-') {
+                    return Some(next.to_string());
+                }
+            }
+        } else if let Some(rest) = t.strip_prefix("--resume=") {
+            return Some(rest.to_string());
         }
-        // claude 세션 경로: /.claude/projects/<slug>/<uuid>.jsonl
-        if cli_name == "claude" && path.contains("/.claude/projects/") {
-            let stem = std::path::Path::new(path).file_stem()?.to_string_lossy();
-            return Some(stem.to_string());
-        }
-        // codex 세션 경로: /.codex/sessions/.../rollout-...-<uuid>.jsonl
-        if cli_name == "codex" && path.contains("/.codex/sessions/") {
-            let stem = std::path::Path::new(path).file_stem()?.to_string_lossy();
-            return Some(extract_codex_id(&stem));
-        }
+        i += 1;
     }
     None
 }
@@ -150,16 +151,25 @@ fn extract_codex_id(stem: &str) -> String {
 }
 
 /// snapshot 결과에서 주어진 cwd + session_id 에 매칭되는 세션을 찾음.
-/// session_id 를 알아낸 프로세스만 태깅 대상 (cwd 충돌 방지).
+/// session_id 가 프로세스 argv 에 있으면 정확 매칭. 없으면 cwd 만 매칭.
+/// (cwd 충돌은 commands.rs 에서 most-recent 세션에만 태깅하는 로직으로 해결)
 pub fn match_running<'a>(
     snapshot: &'a [RunningSession],
     cwd: &Path,
     session_id: &str,
 ) -> Option<&'a RunningSession> {
     let target = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
-    snapshot
+    // 1) 정확 매칭 (--resume 인자가 세션 ID 와 일치)
+    if let Some(r) = snapshot
         .iter()
         .find(|s| s.cwd == target && s.session_id.as_deref() == Some(session_id))
+    {
+        return Some(r);
+    }
+    // 2) fallback: cwd + session_id None (newly started claude, 가장 최근 세션일 확률 큼)
+    snapshot
+        .iter()
+        .find(|s| s.cwd == target && s.session_id.is_none())
 }
 
 /// 주어진 cli (claude/codex) 와 cwd 에 매칭되는 실행 중 프로세스를 찾는다.
