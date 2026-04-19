@@ -25,9 +25,9 @@
 
 | 아이콘 | 상태 |
 |---|---|
-| 👁️ (감은 눈) | 활성 세션 없음 |
-| 👁️ (깜빡임) + N | N개 세션이 응답 생성 중 |
-| 👁️ (뜬 눈) + N | N개 세션이 방금 응답 완료, 확인 대기 |
+| <img src="docs/assets/tray-idle.png" width="22" height="22"> | 활성 세션 없음 — 감은 눈 |
+| <img src="docs/assets/tray-generating.png" width="22" height="22"> + N | N개 세션 응답 생성 중 — 깜빡임 애니메이션 |
+| <img src="docs/assets/tray-finished.png" width="22" height="22"> + N | N개 세션 최근 완료 — 뜬 눈 |
 
 ## 요구 사항
 

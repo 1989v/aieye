@@ -25,9 +25,11 @@
 
 | Icon | State |
 |---|---|
-| 👁️ (closed) | No sessions active |
-| 👁️ (blink loop) + N | N sessions currently generating responses |
-| 👁️ (open) + N | N sessions recently finished, awaiting your attention |
+| <img src="docs/assets/tray-idle.png" width="22" height="22"> | No sessions active — closed eye (idle) |
+| <img src="docs/assets/tray-generating.png" width="22" height="22"> + N | N sessions currently generating responses — blinking animation |
+| <img src="docs/assets/tray-finished.png" width="22" height="22"> + N | N sessions recently finished — open eye (awaiting attention) |
+
+> Panel screenshot & demo GIF coming in `docs/assets/` — [see Live panel preview](docs/assets/) (TODO).
 
 ## Requirements
 
