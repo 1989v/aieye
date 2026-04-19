@@ -112,13 +112,19 @@ pub fn codex_activity(path: &Path) -> Activity {
     if is_stale(path) {
         return Activity::Idle;
     }
-    last_role_codex(path).unwrap_or(Activity::Idle)
+    last_activity_codex(path).unwrap_or(Activity::Idle)
 }
 
-fn last_role_codex(path: &Path) -> Option<Activity> {
+/// Codex 는 response_item(턴) 외에 event_msg 로 task lifecycle 을 쏜다.
+/// 신호 우선순위:
+///   1) event_msg task_started → Generating / task_complete → Idle (실시간 lifecycle)
+///   2) fallback: 마지막 response_item 의 role (user→Generating / assistant→Idle)
+fn last_activity_codex(path: &Path) -> Option<Activity> {
     let file = File::open(path).ok()?;
     let reader = BufReader::new(file);
-    let mut last: Option<Activity> = None;
+    let mut last_event: Option<Activity> = None;
+    let mut last_role: Option<Activity> = None;
+
     for line in reader.lines().map_while(Result::ok) {
         if line.is_empty() {
             continue;
@@ -127,25 +133,38 @@ fn last_role_codex(path: &Path) -> Option<Activity> {
             Ok(v) => v,
             Err(_) => continue,
         };
-        if v.get("type").and_then(|t| t.as_str()) != Some("response_item") {
-            continue;
-        }
+        let line_type = v.get("type").and_then(|t| t.as_str());
         let payload = match v.get("payload") {
             Some(p) => p,
             None => continue,
         };
-        if payload.get("type").and_then(|t| t.as_str()) != Some("message") {
-            continue;
+
+        match line_type {
+            Some("event_msg") => {
+                let evt = payload.get("type").and_then(|t| t.as_str());
+                match evt {
+                    Some("task_started") | Some("user_message") => {
+                        last_event = Some(Activity::Generating);
+                    }
+                    Some("task_complete") => last_event = Some(Activity::Idle),
+                    _ => {}
+                }
+            }
+            Some("response_item") => {
+                if payload.get("type").and_then(|t| t.as_str()) != Some("message") {
+                    continue;
+                }
+                let role = payload.get("role").and_then(|r| r.as_str());
+                last_role = match role {
+                    Some("user") => Some(Activity::Generating),
+                    Some("assistant") => Some(Activity::Idle),
+                    _ => last_role,
+                };
+            }
+            _ => {}
         }
-        let role = payload.get("role").and_then(|r| r.as_str());
-        let act = match role {
-            Some("user") => Activity::Generating,
-            Some("assistant") => Activity::Idle,
-            _ => continue,
-        };
-        last = Some(act);
     }
-    last
+    last_event.or(last_role)
 }
 
 #[cfg(test)]

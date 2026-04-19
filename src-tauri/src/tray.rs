@@ -199,10 +199,19 @@ async fn poll_once(app: &AppHandle) {
             CliKind::Claude => claude_activity(&s.jsonl_path),
             CliKind::Codex => codex_activity(&s.jsonl_path),
         };
+        let fresh = is_mtime_fresh(&s.jsonl_path);
+        tracing::info!(
+            "obs: cli={:?} id={} pid={} activity={:?} mtime_fresh={}",
+            s.cli,
+            s.id,
+            r.pid,
+            activity,
+            fresh
+        );
         obs.push(SessionObservation {
             id: s.id.clone(),
             activity: Some(activity),
-            mtime_fresh: is_mtime_fresh(&s.jsonl_path),
+            mtime_fresh: fresh,
         });
     }
 
