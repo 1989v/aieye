@@ -65,18 +65,29 @@ pub fn get_session_preview(jsonl_path: String, cli: CliKind) -> SessionPreview {
     }
 }
 
-/// 실행 중인 세션 프로세스를 SIGTERM 으로 정상 종료.
-/// Ctrl+C 와 동일하게 claude/codex 가 버퍼 flush 후 깔끔히 exit.
+/// 세션 jsonl 파일을 macOS 휴지통으로 이동 → 목록에서 제거.
+/// 하드 삭제 대신 Finder 의 move-to-trash 사용 → 실수 시 복원 가능.
 #[tauri::command]
-pub fn terminate_session_process(pid: u32) -> Result<(), String> {
-    let status = std::process::Command::new("kill")
-        .args(["-TERM", &pid.to_string()])
-        .status()
-        .map_err(|e| e.to_string())?;
-    if !status.success() {
-        return Err(format!("kill -TERM {pid} failed"));
+pub fn archive_session_file(jsonl_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&jsonl_path);
+    if !path.exists() {
+        return Err("file not found".into());
     }
-    tracing::info!("SIGTERM sent to pid={pid}");
+    let script = format!(
+        r#"tell application "Finder" to delete POSIX file "{}""#,
+        jsonl_path.replace('\\', "\\\\").replace('"', "\\\"")
+    );
+    let output = std::process::Command::new("osascript")
+        .args(["-e", &script])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "osascript failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    tracing::info!("archived to trash: {jsonl_path}");
     Ok(())
 }
 

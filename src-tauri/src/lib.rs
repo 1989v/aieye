@@ -30,7 +30,7 @@ pub fn run() {
             commands::set_settings,
             commands::acknowledge_finished,
             commands::get_session_preview,
-            commands::terminate_session_process
+            commands::archive_session_file
         ]);
 
     #[cfg(target_os = "macos")]

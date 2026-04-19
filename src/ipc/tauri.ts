@@ -44,6 +44,6 @@ export async function getSessionPreview(
   return invoke<SessionPreview>("get_session_preview", { jsonlPath, cli });
 }
 
-export async function terminateSessionProcess(pid: number): Promise<void> {
-  await invoke("terminate_session_process", { pid });
+export async function archiveSessionFile(jsonlPath: string): Promise<void> {
+  await invoke("archive_session_file", { jsonlPath });
 }
