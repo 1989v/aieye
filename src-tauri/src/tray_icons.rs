@@ -51,8 +51,14 @@ pub fn generate_all() -> TrayIcons {
         for base in &candidate_dirs {
             if let Some(bytes) = try_load(base, name) {
                 tracing::info!("tray icon loaded from disk: {name}");
-                // 불투명 픽셀을 파란색으로 리컬러 (alpha 유지 → AA 보존)
-                return Some(recolor_blue(&bytes).unwrap_or(bytes));
+                // 원본이 검정 곡선만 있는 closed-eye 프레임만 파란색 리컬러.
+                // 나머지는 사용자가 만든 파란 디자인 그대로 사용 (디테일 보존).
+                let needs_recolor = matches!(name, "idle" | "gen-3");
+                return Some(if needs_recolor {
+                    recolor_blue(&bytes).unwrap_or(bytes)
+                } else {
+                    bytes
+                });
             }
         }
         None
