@@ -40,4 +40,7 @@ pub struct Session {
     pub state: SessionState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub running: Option<RunningInfo>,
+    /// 직전 응답이 완료되어 사용자가 아직 확인하지 않은 세션인지.
+    #[serde(default)]
+    pub finished: bool,
 }

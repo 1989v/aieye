@@ -72,6 +72,7 @@ impl CodexAdapter {
             message_count: None,
             state: self.classify(mtime),
             running: None,
+            finished: false,
         })
     }
 

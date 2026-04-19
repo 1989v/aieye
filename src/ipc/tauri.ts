@@ -32,3 +32,7 @@ export async function getSettings(): Promise<Settings> {
 export async function setSettings(settings: Settings): Promise<void> {
   await invoke("set_settings", { settings });
 }
+
+export async function acknowledgeFinished(sessionId: string): Promise<void> {
+  await invoke("acknowledge_finished", { sessionId });
+}

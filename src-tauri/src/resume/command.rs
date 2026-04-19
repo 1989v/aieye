@@ -46,6 +46,7 @@ mod tests {
             message_count: None,
             state: SessionState::Recent,
             running: None,
+            finished: false,
         }
     }
 

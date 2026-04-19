@@ -4,6 +4,8 @@ mod resume;
 mod sessions;
 mod settings;
 mod tray;
+mod tray_icons;
+mod tray_state;
 
 #[cfg(target_os = "macos")]
 mod macos_panel;
@@ -25,15 +27,20 @@ pub fn run() {
             commands::reveal_in_finder,
             commands::list_installed_terminals,
             commands::get_settings,
-            commands::set_settings
+            commands::set_settings,
+            commands::acknowledge_finished
         ]);
 
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
 
     builder
+        .manage(tray_state::SharedTrayState::new())
+        .manage(std::sync::Arc::new(tray_icons::generate_all()))
         .setup(|app| {
             tray::build_tray(app)?;
+            tray::spawn_poll_task(app.handle().clone());
+            tray::spawn_animation_task(app.handle().clone());
 
             #[cfg(target_os = "macos")]
             {

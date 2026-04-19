@@ -27,4 +27,5 @@ export interface Session {
   message_count: number | null;
   state: SessionState;
   running?: RunningInfo | null;
+  finished?: boolean;
 }

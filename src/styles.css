@@ -120,6 +120,12 @@ body,
   font-weight: 500;
 }
 
+.session-row .finished-tick {
+  color: #7ee787;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
 .session-row .sub {
   font-size: 11px;
   color: #888;

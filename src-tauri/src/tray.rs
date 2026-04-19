@@ -1,9 +1,25 @@
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, LogicalPosition, Manager,
+    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
+    App, AppHandle, LogicalPosition, Manager,
 };
 use tracing::info;
+
+use crate::sessions::SessionCoordinator;
+use crate::tray_icons::TrayIcons;
+use crate::tray_state::{is_mtime_fresh, SessionObservation, SharedTrayState, TraySummary};
+
+/// 현재 애니메이션 프레임 인덱스 (generating 중일 때만 의미). 폴링과 애니메이션
+/// 스레드 둘 다 읽음.
+static FRAME_IDX: AtomicU32 = AtomicU32::new(0);
+/// 마지막 poll 결과를 캐싱해 애니메이션 tick 이 같은 상태를 유지할 수 있게 함.
+/// (generating_count, finished_count) 만 필요.
+static LAST_GEN_COUNT: AtomicU32 = AtomicU32::new(0);
+static LAST_FINISHED_COUNT: AtomicU32 = AtomicU32::new(0);
 
 #[cfg(target_os = "macos")]
 use crate::macos_panel;
@@ -32,8 +48,11 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
     let quit_item = MenuItem::with_id(app, "quit", "Quit aieye", true, Some("cmd+q"))?;
     let menu = Menu::with_items(app, &[&quit_item])?;
 
+    let icons = app.state::<Arc<TrayIcons>>();
+    let idle_icon = tauri::image::Image::from_bytes(&icons.idle)?;
     let _tray = TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(idle_icon)
+        .icon_as_template(true)
         .menu(&menu)
         .menu_on_left_click(false)
         .on_menu_event(|app, event| {
@@ -50,6 +69,13 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
             } = event
             {
                 let app = tray.app_handle();
+                // 트레이 클릭 = 모든 finished 확인 처리
+                if let Some(state) = app.try_state::<SharedTrayState>() {
+                    if let Ok(mut s) = state.0.lock() {
+                        s.acknowledge_all();
+                    }
+                }
+                apply_tray_visual(app, 0, 0, &FRAME_IDX);
 
                 #[cfg(target_os = "macos")]
                 {
@@ -132,4 +158,113 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
         .build(app)?;
 
     Ok(())
+}
+
+/// 주기적으로 세션 스캔 → TrayState 갱신 → 트레이 아이콘/title 반영.
+pub fn spawn_poll_task(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
+        interval.tick().await; // 즉시 1회
+        loop {
+            poll_once(&app).await;
+            interval.tick().await;
+        }
+    });
+}
+
+async fn poll_once(app: &AppHandle) {
+    use crate::parser::{claude_activity, codex_activity};
+    use crate::resume::{match_running, snapshot_running};
+    use crate::sessions::CliKind;
+
+    let coord = SessionCoordinator::with_defaults();
+    let sessions = coord.scan_all().await;
+    let claude_snap = snapshot_running("claude");
+    let codex_snap = snapshot_running("codex");
+
+    let mut obs: Vec<SessionObservation> = Vec::new();
+    for s in &sessions {
+        let Some(cwd) = s.project_path.as_deref() else { continue };
+        let snap = match s.cli {
+            CliKind::Claude => &claude_snap,
+            CliKind::Codex => &codex_snap,
+        };
+        if match_running(snap, cwd, &s.id).is_none() {
+            continue; // 프로세스 없는 세션은 관측 대상 아님
+        }
+        let activity = match s.cli {
+            CliKind::Claude => claude_activity(&s.jsonl_path),
+            CliKind::Codex => codex_activity(&s.jsonl_path),
+        };
+        obs.push(SessionObservation {
+            id: s.id.clone(),
+            activity: Some(activity),
+            mtime_fresh: is_mtime_fresh(&s.jsonl_path),
+        });
+    }
+
+    let summary = {
+        let Some(state) = app.try_state::<SharedTrayState>() else { return };
+        let Ok(mut s) = state.0.lock() else { return };
+        s.update(&obs)
+    };
+
+    LAST_GEN_COUNT.store(summary.generating_count as u32, Ordering::Relaxed);
+    LAST_FINISHED_COUNT.store(summary.finished_count as u32, Ordering::Relaxed);
+
+    apply_tray_visual(
+        app,
+        summary.generating_count as u32,
+        summary.finished_count as u32,
+        &FRAME_IDX,
+    );
+
+    tracing::debug!("poll: {:?}", summary);
+}
+
+/// generating 세션이 있을 때만 200ms 마다 프레임 교체.
+pub fn spawn_animation_task(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(200));
+        loop {
+            interval.tick().await;
+            let gen = LAST_GEN_COUNT.load(Ordering::Relaxed);
+            if gen == 0 {
+                continue;
+            }
+            FRAME_IDX.fetch_add(1, Ordering::Relaxed);
+            let finished = LAST_FINISHED_COUNT.load(Ordering::Relaxed);
+            apply_tray_visual(&app, gen, finished, &FRAME_IDX);
+        }
+    });
+}
+
+fn apply_tray_visual(
+    app: &AppHandle,
+    generating: u32,
+    finished: u32,
+    frame_idx: &AtomicU32,
+) {
+    let Some(tray) = app.tray_by_id("main") else { return };
+    let Some(icons) = app.try_state::<Arc<TrayIcons>>() else { return };
+
+    let (icon_bytes, title) = if generating > 0 {
+        let frame = (frame_idx.load(Ordering::Relaxed) as usize) % icons.generating.len();
+        (&icons.generating[frame], format!(" {}", generating))
+    } else if finished > 0 {
+        (&icons.finished, format!(" {}", finished))
+    } else {
+        (&icons.idle, String::new())
+    };
+
+    if let Ok(img) = tauri::image::Image::from_bytes(icon_bytes) {
+        let _ = tray.set_icon(Some(img));
+        let _ = tray.set_icon_as_template(true);
+    }
+    let _ = tray.set_title(Some(title));
+}
+
+#[allow(dead_code)]
+fn tray_handle(app: &AppHandle) -> Option<TrayIcon> {
+    app.tray_by_id("main")
 }

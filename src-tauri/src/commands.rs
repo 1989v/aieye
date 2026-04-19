@@ -4,13 +4,13 @@ use crate::resume::{
 };
 use crate::sessions::{CliKind, Session, SessionCoordinator};
 use crate::settings::{self, Settings};
+use crate::tray_state::SharedTrayState;
+use tauri::State;
 
 #[tauri::command]
-pub async fn list_sessions() -> Result<Vec<Session>, String> {
+pub async fn list_sessions(state: State<'_, SharedTrayState>) -> Result<Vec<Session>, String> {
     let coord = SessionCoordinator::with_defaults();
     let mut sessions = coord.scan_all().await;
-    // pgrep/lsof/ps 를 세션마다 호출하면 N회 — 대신 cli 당 1회 snapshot 후
-    // 세션 루프에선 cwd 매칭만 수행.
     let claude_snap = snapshot_running("claude");
     let codex_snap = snapshot_running("codex");
     for s in &mut sessions {
@@ -28,7 +28,19 @@ pub async fn list_sessions() -> Result<Vec<Session>, String> {
             s.running = Some(info);
         }
     }
+    if let Ok(ts) = state.0.lock() {
+        for s in &mut sessions {
+            s.finished = ts.is_finished(&s.id);
+        }
+    }
     Ok(sessions)
+}
+
+#[tauri::command]
+pub fn acknowledge_finished(session_id: String, state: State<'_, SharedTrayState>) {
+    if let Ok(mut ts) = state.0.lock() {
+        ts.acknowledge(&session_id);
+    }
 }
 
 fn copy_to_clipboard(text: &str) {
@@ -49,7 +61,11 @@ fn copy_to_clipboard(text: &str) {
 pub async fn resume_session(
     session: Session,
     terminal: Option<TerminalApp>,
+    state: State<'_, SharedTrayState>,
 ) -> Result<(), String> {
+    if let Ok(mut ts) = state.0.lock() {
+        ts.acknowledge(&session.id);
+    }
     // 1. 세션이 지금 돌고 있나? (cwd 매칭 프로세스 존재)
     if let Some(cwd) = &session.project_path {
         let cli_name = match session.cli {
@@ -98,7 +114,11 @@ pub async fn resume_session(
 pub async fn resume_session_force_new(
     session: Session,
     terminal: Option<TerminalApp>,
+    state: State<'_, SharedTrayState>,
 ) -> Result<(), String> {
+    if let Ok(mut ts) = state.0.lock() {
+        ts.acknowledge(&session.id);
+    }
     launch_new(&session, terminal).map_err(|e| e.to_string())
 }
 

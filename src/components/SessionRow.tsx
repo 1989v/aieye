@@ -49,7 +49,10 @@ export function SessionRow({ session }: { session: Session }) {
       <span className="state">{stateDot(session.state)}</span>
       <span className="cli">[{session.cli}]</span>
       <div className="body">
-        <div className="title">{session.title}</div>
+        <div className="title">
+          {session.finished && <span className="finished-tick">✓</span>}
+          {session.title}
+        </div>
         <div className="sub">
           {session.project_path ?? "unknown path"}
           {session.git_branch && <> · {session.git_branch}</>}
