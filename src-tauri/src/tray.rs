@@ -85,39 +85,59 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                                 panel.order_out(None);
                             } else {
                                 if let Some(win) = app.get_webview_window("panel") {
-                                    let scale = win.scale_factor().unwrap_or(2.0);
                                     let (tx, ty, tw, th) = extract_rect(&rect);
-                                    let left_edge = tx / scale;
-                                    let right_edge = (tx + tw) / scale;
-                                    let bottom_y = (ty + th) / scale;
-                                    const PANEL_W: f64 = 640.0;
-                                    // macOS popover 는 메뉴바와 거의 붙음 (SwiftUI MenuBarExtra 관례)
-                                    const GAP: f64 = 0.0;
-                                    const EDGE_MARGIN: f64 = 8.0;
+                                    // tray 가 클릭된 위치(tx, ty)가 속한 monitor 를 찾아 그 모니터의
+                                    // scale / 경계를 사용. 멀티모니터에서 current_monitor 를
+                                    // 쓰면 패널이 이전에 뜬 모니터 기준으로 계산돼 엉뚱한 위치로 감.
+                                    let monitors = win.available_monitors().unwrap_or_default();
+                                    let click_x = tx + tw / 2.0; // 아이콘 중심
+                                    let click_y = ty + th / 2.0;
+                                    let target_monitor = monitors.iter().find(|m| {
+                                        let p = m.position();
+                                        let s = m.size();
+                                        let (mx, my) = (p.x as f64, p.y as f64);
+                                        let (mw, mh) = (s.width as f64, s.height as f64);
+                                        click_x >= mx && click_x < mx + mw
+                                            && click_y >= my && click_y < my + mh
+                                    });
 
-                                    // 기본: 아이콘 좌측 끝 기준으로 우측 하단 펼침
-                                    // 화면 우측 경계를 넘으면 우측 끝 기준으로 좌측 하단 펼침
-                                    let (screen_left, screen_right) = match win.current_monitor() {
-                                        Ok(Some(m)) => {
+                                    let (scale, screen_left, screen_right) = match target_monitor {
+                                        Some(m) => {
+                                            let s = m.scale_factor();
                                             let pos = m.position();
                                             let size = m.size();
                                             (
-                                                pos.x as f64 / scale,
-                                                (pos.x as f64 + size.width as f64) / scale,
+                                                s,
+                                                pos.x as f64 / s,
+                                                (pos.x as f64 + size.width as f64) / s,
                                             )
                                         }
-                                        _ => (0.0, f64::MAX),
+                                        None => {
+                                            let s = win.scale_factor().unwrap_or(2.0);
+                                            (s, 0.0, f64::MAX)
+                                        }
                                     };
+
+                                    let left_edge = tx / scale;
+                                    let right_edge = (tx + tw) / scale;
+                                    let bottom_y = (ty + th) / scale;
+
+                                    const PANEL_W: f64 = 640.0;
+                                    const GAP: f64 = 0.0;
+                                    const EDGE_MARGIN: f64 = 8.0;
 
                                     let right_aligned = left_edge + PANEL_W > screen_right - EDGE_MARGIN;
                                     let x = if right_aligned {
-                                        // 우측 끝 기준 좌측으로 펼침
                                         (right_edge - PANEL_W).max(screen_left + EDGE_MARGIN)
                                     } else {
                                         left_edge
                                     };
 
                                     let y = bottom_y + GAP;
+                                    tracing::info!(
+                                        "panel open: click=({:.0},{:.0}) monitor=[{:.0}..{:.0}] scale={} → pos=({:.0},{:.0})",
+                                        click_x, click_y, screen_left, screen_right, scale, x, y
+                                    );
                                     let _ = win.set_position(LogicalPosition::new(x, y));
                                 }
                                 panel.set_level(25);
@@ -127,6 +147,9 @@ pub fn build_tray(app: &App) -> tauri::Result<()> {
                                         | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary,
                                 );
                                 panel.show();
+                                // 프론트가 세션 리스트 새로고침할 수 있게 이벤트 emit
+                                use tauri::Emitter;
+                                let _ = app.emit("panel-shown", ());
                                 info!("panel.show() called");
                             }
                         }
