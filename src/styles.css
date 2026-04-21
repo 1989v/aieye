@@ -60,6 +60,19 @@ body,
   align-items: center;
 }
 
+.header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header .brand-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+}
+
 .header .count {
   font-weight: 400;
   color: #888;

@@ -1,21 +1,16 @@
 //! 트레이 아이콘: 파일 기반 로딩. `src-tauri/icons/tray/` 에 있는 PNG 를
 //! 런타임에 읽어들임. 파일 없으면 programmatic fallback.
 //!
-//! 기대 파일 (없으면 fallback):
-//!   idle.png / idle@2x.png
-//!   finished.png / finished@2x.png
-//!   gen-0.png ~ gen-5.png (+ @2x)
+//! 기대 파일 (Figma blink 세트, 없으면 fallback):
+//!   blink_{22,44,88}_f{0..6}.png
+//!     f0 = fully open (idle), f6 = fully closed
+//!   런타임은 88px 을 메인으로 사용 (22/44 는 번들 동봉 — 향후 확장/툴 용).
 //!
-//! @2x 가 있으면 우선, 없으면 @1x 사용. 둘 다 없으면 programmatic fallback.
+//! 애니메이션은 ping-pong (f0→f6→f1) 12 프레임 순환 = 자연스러운 눈 깜빡임.
 
 use image::{ImageBuffer, Rgba, RgbaImage};
 
 const SIZE: u32 = 44;
-/// 트레이 아이콘 기본 색상 (macOS system blue 톤).
-/// alpha 는 원본 유지 (AA 엣지 보존).
-const TINT_R: u8 = 77;
-const TINT_G: u8 = 163;
-const TINT_B: u8 = 255;
 const CX: f32 = 22.0;
 const CY: f32 = 22.0;
 const EYE_HALF_W: f32 = 16.0;
@@ -28,64 +23,62 @@ pub struct TrayIcons {
 }
 
 pub fn generate_all() -> TrayIcons {
-    // 파일 탐색 기준: CARGO_MANIFEST_DIR/icons/tray/
-    // 번들에서 실행될 땐 bundle 내부 resource 참조는 불편하므로 런타임 개발 편의상
-    // 현재 실행 경로 기반 몇 군데 순회.
-    // exe 위치 기준 여러 후보 (tauri bundle 구조 변동 대비)
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
         .unwrap_or_default();
     let candidate_dirs = [
-        // dev: cargo run / debug build
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("icons/tray"),
-        // 표준 macOS app: .app/Contents/Resources/icons/tray
         exe_dir.join("../Resources/icons/tray"),
-        // tauri resources 경로 변형
         exe_dir.join("../Resources/_up_/icons/tray"),
-        // fallback: exe 바로 옆
         exe_dir.join("icons/tray"),
     ];
 
-    let loader = |name: &str| {
+    let load = |name: &str| -> Option<Vec<u8>> {
         for base in &candidate_dirs {
-            if let Some(bytes) = try_load(base, name) {
-                tracing::info!("tray icon loaded from disk: {name}");
-                // 원본이 검정 곡선만 있는 closed-eye 프레임만 파란색 리컬러.
-                // 나머지는 사용자가 만든 파란 디자인 그대로 사용 (디테일 보존).
-                let needs_recolor = matches!(name, "idle" | "gen-3");
-                return Some(if needs_recolor {
-                    recolor_blue(&bytes).unwrap_or(bytes)
-                } else {
-                    bytes
-                });
+            let path = base.join(format!("{name}.png"));
+            if path.exists() {
+                if let Ok(bytes) = std::fs::read(&path) {
+                    tracing::info!("tray icon loaded from disk: {name}");
+                    return Some(bytes);
+                }
             }
         }
         None
     };
 
-    let frames_names = ["gen-0", "gen-1", "gen-2", "gen-3", "gen-4", "gen-5"];
-    let frames_loaded: Vec<Vec<u8>> = frames_names
-        .iter()
-        .map(|n| loader(n))
-        .collect::<Vec<_>>()
-        .into_iter()
-        .flatten()
-        .collect();
+    // 88px 프레임을 메인으로 로드 (f0 = open, f6 = closed).
+    let frames: Vec<Option<Vec<u8>>> =
+        (0..=6).map(|i| load(&format!("blink_88_f{i}"))).collect();
+    let all_ok = frames.iter().all(|f| f.is_some());
+
+    let (idle_bytes, generating_seq) = if all_ok {
+        let f: Vec<Vec<u8>> = frames.into_iter().flatten().collect();
+        // ping-pong: f0,f1,f2,f3,f4,f5,f6,f5,f4,f3,f2,f1 (12 프레임)
+        let seq: Vec<Vec<u8>> = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1]
+            .iter()
+            .map(|&i| f[i].clone())
+            .collect();
+        (f[0].clone(), seq)
+    } else {
+        // programmatic fallback — 모든 프레임이 있어야 ping-pong 이 매끄러움.
+        let defaults = [1.0_f32, 0.83, 0.66, 0.5, 0.33, 0.16, 0.0];
+        let rendered: Vec<Vec<u8>> = defaults
+            .iter()
+            .map(|o| render_png(draw_eye(*o, true)))
+            .collect();
+        let seq: Vec<Vec<u8>> = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1]
+            .iter()
+            .map(|&i| rendered[i].clone())
+            .collect();
+        (rendered[0].clone(), seq)
+    };
 
     let icons = TrayIcons {
-        idle: loader("idle").unwrap_or_else(|| render_png(draw_eye(0.0, false))),
-        finished: loader("finished").unwrap_or_else(|| render_png(draw_eye(1.0, true))),
-        // 6개가 전부 있어야 애니메이션이 매끄러움 — 하나라도 누락되면 전부 fallback
-        generating: if frames_loaded.len() == frames_names.len() {
-            frames_loaded
-        } else {
-            let defaults = [1.0_f32, 0.7, 0.3, 0.0, 0.3, 0.7];
-            defaults
-                .iter()
-                .map(|o| render_png(draw_eye(*o, true)))
-                .collect()
-        },
+        // finished 는 별도 디자인이 없으므로 f0 (open) 공유 + 숫자 배지로 구분.
+        idle: idle_bytes.clone(),
+        finished: idle_bytes,
+        generating: generating_seq,
     };
 
     if let Some(dir) = std::env::var_os("AIEYE_DUMP_ICONS") {
@@ -98,42 +91,6 @@ pub fn generate_all() -> TrayIcons {
         }
     }
     icons
-}
-
-/// PNG 바이트 입력 → 불투명 픽셀 전부를 TINT_* 블루로 치환, alpha 는 보존.
-/// AA 엣지는 원본 alpha 에 의해 자연스럽게 유지됨. 실패 시 원본 유지.
-fn recolor_blue(png: &[u8]) -> Option<Vec<u8>> {
-    let img = image::load_from_memory(png).ok()?;
-    let mut rgba = img.to_rgba8();
-    for p in rgba.pixels_mut() {
-        if p.0[3] > 0 {
-            p.0[0] = TINT_R;
-            p.0[1] = TINT_G;
-            p.0[2] = TINT_B;
-        }
-    }
-    let mut out = Vec::new();
-    rgba
-        .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
-        .ok()?;
-    Some(out)
-}
-
-/// @2x 우선, 없으면 @1x. 둘 다 없으면 None.
-fn try_load(base: &std::path::Path, stem: &str) -> Option<Vec<u8>> {
-    let hi = base.join(format!("{stem}@2x.png"));
-    if hi.exists() {
-        if let Ok(bytes) = std::fs::read(&hi) {
-            return Some(bytes);
-        }
-    }
-    let lo = base.join(format!("{stem}.png"));
-    if lo.exists() {
-        if let Ok(bytes) = std::fs::read(&lo) {
-            return Some(bytes);
-        }
-    }
-    None
 }
 
 fn render_png(img: RgbaImage) -> Vec<u8> {

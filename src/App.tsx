@@ -101,7 +101,17 @@ export default function App() {
     <div className="app split">
       <div className="left">
         <div className="header">
-          👁 aieye
+          <span className="brand">
+            <img
+              className="brand-icon"
+              src="/panel-eye.png"
+              srcSet="/panel-eye.png 1x, /panel-eye@2x.png 2x"
+              alt=""
+              width={18}
+              height={18}
+            />
+            aieye
+          </span>
           {sessions && <span className="count">{filtered.length}</span>}
         </div>
         <ManageBar
