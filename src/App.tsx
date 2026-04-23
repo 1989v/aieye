@@ -148,9 +148,9 @@ export default function App() {
 
       <ConfirmDialog
         open={confirmBulk}
-        title="선택한 세션을 휴지통으로"
-        message={`${selected.size}개 세션을 휴지통으로 이동합니다.\n\n최근 7일 이내 활동 세션은 백엔드 안전장치로 자동 제외됩니다.\nFinder 휴지통에서 복구 가능.`}
-        confirmLabel={`${selected.size}개 이동`}
+        title="Move selected to Trash"
+        message={`Moving ${selected.size} session(s) to Trash.\n\nSessions active within the last 7 days are automatically skipped by a backend safeguard.\nRecoverable from Finder Trash.`}
+        confirmLabel={`Move ${selected.size}`}
         danger
         onCancel={() => setConfirmBulk(false)}
         onConfirm={() => {
@@ -160,13 +160,13 @@ export default function App() {
       />
       <ConfirmDialog
         open={bulkResult !== null}
-        title="완료"
+        title="Done"
         message={
           bulkResult
-            ? `${bulkResult.archived}개 이동 완료.${bulkResult.skipped > 0 ? `\n${bulkResult.skipped}개는 최근 활동으로 보호되어 skip.` : ""}`
+            ? `Moved ${bulkResult.archived}.${bulkResult.skipped > 0 ? `\n${bulkResult.skipped} skipped (recent activity, protected).` : ""}`
             : ""
         }
-        confirmLabel="확인"
+        confirmLabel="OK"
         cancelLabel=""
         onCancel={() => setBulkResult(null)}
         onConfirm={() => setBulkResult(null)}

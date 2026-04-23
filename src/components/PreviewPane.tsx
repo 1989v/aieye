@@ -38,7 +38,7 @@ export function PreviewPane({ session }: Props) {
   if (!session) {
     return (
       <div className="preview-pane empty-preview">
-        <div className="hint">세션 위에 마우스를 올리면 대화 내용이 여기 표시됩니다.</div>
+        <div className="hint">Hover a session to preview its conversation.</div>
       </div>
     );
   }
@@ -51,9 +51,9 @@ export function PreviewPane({ session }: Props) {
           [{session.cli}] · {session.project_path ?? "-"}
         </div>
       </div>
-      {loading && !preview && <div className="hint">로드 중…</div>}
+      {loading && !preview && <div className="hint">Loading…</div>}
       {preview && preview.recent_turns.length === 0 && (
-        <div className="hint">최근 대화 없음.</div>
+        <div className="hint">No recent messages.</div>
       )}
       {preview && preview.recent_turns.length > 0 && (
         <div className="turns">

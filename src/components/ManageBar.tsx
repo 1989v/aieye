@@ -21,11 +21,11 @@ interface Props {
 }
 
 const AGE_OPTIONS: { value: AgeFilter; label: string }[] = [
-  { value: "all", label: "전체" },
-  { value: "7d", label: "7일 이상" },
-  { value: "30d", label: "30일 이상" },
-  { value: "90d", label: "90일 이상" },
-  { value: "180d", label: "180일 이상" },
+  { value: "all", label: "All" },
+  { value: "7d", label: "7d+" },
+  { value: "30d", label: "30d+" },
+  { value: "90d", label: "90d+" },
+  { value: "180d", label: "180d+" },
 ];
 
 export function ManageBar({
@@ -44,13 +44,13 @@ export function ManageBar({
       <div className="row">
         <input
           type="text"
-          placeholder="검색 (제목 / 경로)"
+          placeholder="Search (title / path)"
           className="search"
           value={filter.query}
           onChange={(e) => onFilterChange({ ...filter, query: e.target.value })}
         />
         <button className="toggle" onClick={onToggleManage}>
-          {manageMode ? "완료" : "정리"}
+          {manageMode ? "Done" : "Manage"}
         </button>
       </div>
       {manageMode && (
@@ -62,7 +62,7 @@ export function ManageBar({
                 onFilterChange({ ...filter, cli: e.target.value as FilterState["cli"] })
               }
             >
-              <option value="all">모든 CLI</option>
+              <option value="all">All CLIs</option>
               <option value="claude">Claude</option>
               <option value="codex">Codex</option>
             </select>
@@ -81,22 +81,22 @@ export function ManageBar({
           </div>
           <div className="row small actions">
             <span className="info">
-              선택 {selectedCount} / 대상 {eligibleCount}
-              <span className="hint-inline"> · 최근 7일 이내 세션은 보호됨</span>
+              Selected {selectedCount} / Eligible {eligibleCount}
+              <span className="hint-inline"> · Last 7 days are protected</span>
             </span>
             <div className="spacer" />
             <button onClick={onSelectAllEligible} disabled={eligibleCount === 0}>
-              전체 선택
+              Select all
             </button>
             <button onClick={onClearSelection} disabled={selectedCount === 0}>
-              해제
+              Clear
             </button>
             <button
               className="danger"
               onClick={onBulkDelete}
               disabled={selectedCount === 0}
             >
-              {selectedCount}개 휴지통 이동
+              Move {selectedCount} to Trash
             </button>
           </div>
         </>

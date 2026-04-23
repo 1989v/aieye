@@ -80,7 +80,7 @@ fn launch_iterm2(cmd: &str) -> anyhow::Result<()> {
 
 fn launch_direct_binary(bin: &str, args: &[&str]) -> anyhow::Result<()> {
     if !std::path::Path::new(bin).exists() {
-        anyhow::bail!("{bin} not found — 해당 터미널 앱이 설치됐는지 확인");
+        anyhow::bail!("{bin} not found — check that the terminal app is installed");
     }
     Command::new(bin).args(args).spawn()?;
     Ok(())

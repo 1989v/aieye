@@ -122,7 +122,7 @@ export function SessionRow({
           disabled={!eligible}
           onClick={(e) => e.stopPropagation()}
           onChange={() => eligible && onToggleSelect?.(session.id)}
-          title={eligible ? "선택" : "최근 7일 이내 — 보호됨"}
+          title={eligible ? "Select" : "Within 7 days — protected"}
         />
       )}
       <span className="state">{stateDot(session.state)}</span>
@@ -157,9 +157,9 @@ export function SessionRow({
       </button>
       <ConfirmDialog
         open={confirmArchive}
-        title="세션을 휴지통으로 이동"
-        message={`[${session.cli}] ${session.title}\n\n목록에서 사라지며 --resume 으로 재개 불가. Finder 휴지통에서 복구 가능.`}
-        confirmLabel="이동"
+        title="Move session to Trash"
+        message={`[${session.cli}] ${session.title}\n\nRemoved from list, no longer resumable with --resume. Recoverable from Finder Trash.`}
+        confirmLabel="Move"
         danger
         onCancel={() => setConfirmArchive(false)}
         onConfirm={() => {
