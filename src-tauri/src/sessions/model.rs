@@ -54,4 +54,33 @@ pub struct Session {
     /// 행 아래 1줄 요약 (C).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inline_preview: Option<SessionPreviewInline>,
+    /// project_path 의 마지막 세그먼트, None 이면 "(no project)"
+    #[serde(default)]
+    pub repo_name: String,
+    /// Claude Code Task tool 서브에이전트들. lazy fetch 전에는 empty.
+    #[serde(default)]
+    pub subagents: Vec<SubagentRow>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SubagentState {
+    Pending,
+    Running,
+    Completed,
+    Errored,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubagentRow {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub state: SubagentState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_text: Option<String>,
+    pub started_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
 }

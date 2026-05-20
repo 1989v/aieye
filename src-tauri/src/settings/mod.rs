@@ -1,6 +1,6 @@
 pub mod model;
 
-pub use model::Settings;
+pub use model::{ReplyMode, Settings};
 
 use std::path::PathBuf;
 
