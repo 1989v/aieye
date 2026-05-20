@@ -1,8 +1,18 @@
 import type { Session } from "../types/session";
 import { SessionRow } from "./SessionRow";
+import { RepoGroupHeader } from "./RepoGroupHeader";
+
+interface RepoGroup {
+  repoName: string;
+  sessions: Session[];
+  latestActivity: string;
+}
 
 interface Props {
-  sessions: Session[];
+  groups: RepoGroup[];
+  collapsedRepos: Set<string>;
+  onToggleRepo: (name: string) => void;
+  groupByRepo: boolean;
   onHover?: (session: Session | null) => void;
   manageMode?: boolean;
   selected?: Set<string>;
@@ -10,30 +20,61 @@ interface Props {
   onToggleSelect?: (id: string) => void;
 }
 
+function relativeTime(iso: string): string {
+  if (!iso) return "";
+  const delta = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (delta < 60) return `${Math.floor(delta)}s ago`;
+  if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
+  if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+  return `${Math.floor(delta / 86400)}d ago`;
+}
+
 export function SessionList({
-  sessions,
+  groups,
+  collapsedRepos,
+  onToggleRepo,
+  groupByRepo,
   onHover,
   manageMode,
   selected,
   eligibleIds,
   onToggleSelect,
 }: Props) {
-  if (sessions.length === 0) {
+  const totalSessions = groups.reduce((sum, g) => sum + g.sessions.length, 0);
+  if (totalSessions === 0) {
     return <div className="empty">No sessions yet.</div>;
   }
   return (
     <div className="session-list" onMouseLeave={() => onHover?.(null)}>
-      {sessions.map((s) => (
-        <SessionRow
-          key={`${s.cli}-${s.id}`}
-          session={s}
-          onHover={onHover}
-          manageMode={manageMode}
-          selected={selected?.has(s.id)}
-          eligible={eligibleIds?.has(s.id) ?? false}
-          onToggleSelect={onToggleSelect}
-        />
-      ))}
+      {groups.map((g) => {
+        const isCollapsed = collapsedRepos.has(g.repoName);
+        const showHeader = groupByRepo && (groups.length > 1 || g.repoName !== "");
+        return (
+          <div key={g.repoName || "_flat"} className="repo-group">
+            {showHeader && (
+              <RepoGroupHeader
+                repoName={g.repoName}
+                sessionCount={g.sessions.length}
+                latestRelative={relativeTime(g.latestActivity)}
+                collapsed={isCollapsed}
+                onToggle={() => onToggleRepo(g.repoName)}
+              />
+            )}
+            {!isCollapsed &&
+              g.sessions.map((s) => (
+                <SessionRow
+                  key={`${s.cli}-${s.id}`}
+                  session={s}
+                  onHover={onHover}
+                  manageMode={manageMode}
+                  selected={selected?.has(s.id)}
+                  eligible={eligibleIds?.has(s.id) ?? false}
+                  onToggleSelect={onToggleSelect}
+                />
+              ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

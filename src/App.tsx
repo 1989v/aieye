@@ -8,6 +8,7 @@ import { ManageBar, type FilterState } from "./components/ManageBar";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { archiveSessionsBulk } from "./ipc/tauri";
 import type { Session } from "./types/session";
+import { useSettings } from "./hooks/useSettings";
 
 const SAFETY_DAYS = 7;
 
@@ -32,6 +33,7 @@ function ageThresholdDays(age: FilterState["age"]): number {
 
 export default function App() {
   const { sessions, error } = useSessions();
+  const { settings } = useSettings();
   const [hovered, setHovered] = useState<Session | null>(null);
   const [manageMode, setManageMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -60,6 +62,46 @@ export default function App() {
       return true;
     });
   }, [sessions, filter]);
+
+  interface RepoGroup {
+    repoName: string;
+    sessions: Session[];
+    latestActivity: string;
+  }
+
+  const grouped = useMemo<RepoGroup[]>(() => {
+    if (!settings?.group_by_repo) {
+      return [{ repoName: "", sessions: filtered, latestActivity: "" }];
+    }
+    const map = new Map<string, Session[]>();
+    for (const s of filtered) {
+      const key = s.repo_name || "(no project)";
+      const arr = map.get(key);
+      if (arr) arr.push(s);
+      else map.set(key, [s]);
+    }
+    const groups: RepoGroup[] = [];
+    for (const [name, list] of map) {
+      list.sort((a, b) => b.last_activity.localeCompare(a.last_activity));
+      groups.push({ repoName: name, sessions: list, latestActivity: list[0].last_activity });
+    }
+    groups.sort((a, b) => {
+      if (a.repoName === "(no project)") return 1;
+      if (b.repoName === "(no project)") return -1;
+      return b.latestActivity.localeCompare(a.latestActivity);
+    });
+    return groups;
+  }, [filtered, settings?.group_by_repo]);
+
+  const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set());
+  const toggleRepo = (name: string) => {
+    setCollapsedRepos((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
 
   const eligibleIds = useMemo(() => {
     const ids = new Set<string>();
@@ -132,7 +174,10 @@ export default function App() {
         {sessions === null && !error && <div className="empty">Scanning…</div>}
         {sessions && (
           <SessionList
-            sessions={filtered}
+            groups={grouped}
+            collapsedRepos={collapsedRepos}
+            onToggleRepo={toggleRepo}
+            groupByRepo={settings?.group_by_repo ?? true}
             onHover={setHovered}
             manageMode={manageMode}
             selected={selected}

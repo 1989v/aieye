@@ -563,3 +563,43 @@ body,
   font-size: 11px;
   min-width: 110px;
 }
+
+.repo-group {
+  display: flex;
+  flex-direction: column;
+}
+.repo-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-muted, #9aa);
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+}
+.repo-group-header:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.repo-group-header .caret {
+  width: 10px;
+  font-size: 10px;
+}
+.repo-group-header .repo-name {
+  font-weight: 600;
+  color: var(--text, #ddd);
+}
+.repo-group-header .repo-count {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+.repo-group-header .repo-latest {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.6;
+}
