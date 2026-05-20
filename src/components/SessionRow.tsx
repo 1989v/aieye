@@ -100,19 +100,21 @@ export function SessionRow({
   useEffect(() => {
     if (!menuOpen) return;
     const close = () => setMenuOpen(false);
-    const onDocClick = (e: MouseEvent) => {
+    const onDocPointer = (e: Event) => {
       if (!rootRef.current) return;
       if (!rootRef.current.contains(e.target as Node)) close();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDocPointer, true);
+    document.addEventListener("click", onDocPointer, true);
+    document.addEventListener("keydown", onKey, true);
     window.addEventListener("blur", close);
     return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDocPointer, true);
+      document.removeEventListener("click", onDocPointer, true);
+      document.removeEventListener("keydown", onKey, true);
       window.removeEventListener("blur", close);
     };
   }, [menuOpen]);
@@ -123,7 +125,7 @@ export function SessionRow({
       if (eligible) onToggleSelect?.(session.id);
       return;
     }
-    resumeSession(session).catch((err) => console.error(err));
+    onPinReply?.(session);
   };
 
   const preview = session.inline_preview;
@@ -179,17 +181,6 @@ export function SessionRow({
         )}
       </div>
       <button
-        className="row-reply-btn"
-        data-row-action="reply"
-        title="Reply in panel"
-        onClick={(e) => {
-          e.stopPropagation();
-          onPinReply?.(session);
-        }}
-      >
-        ✉
-      </button>
-      <button
         className="row-menu-btn"
         data-row-action="menu"
         onClick={(e) => {
@@ -222,6 +213,15 @@ export function SessionRow({
       />
       {menuOpen && (
         <div className="row-menu" onClick={(e) => e.stopPropagation()}>
+          <button
+            data-row-action="menu"
+            onClick={() => {
+              resumeSession(session).catch((err) => console.error(err));
+              setMenuOpen(false);
+            }}
+          >
+            Focus terminal (resume)
+          </button>
           <button
             data-row-action="menu"
             onClick={() => {

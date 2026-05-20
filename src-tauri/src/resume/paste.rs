@@ -18,12 +18,13 @@ pub async fn send(session: &Session, text: &str) -> Result<(), String> {
     let bundle = match host_kind {
         "terminal" => "Terminal",
         "iterm2" => "iTerm",
-        // Alacritty/Kitty: host_kind 는 "other" 로 들어옴. 이름이 있으면 사용.
-        "other" => running.host_name.as_deref().unwrap_or("Terminal"),
-        "vscode" | "jetbrains" => {
-            return Err(format!(
-                "host_unsupported: paste only works in Terminal/iTerm2 (got: {host_kind})"
-            ));
+        // Alacritty/Kitty/IDE: host_name 으로 bundle 식별 (best-effort).
+        // IDE 내장 터미널이 focused 상태일 때 동작. 다른 탭이면 키스트로크가 엉뚱한 곳으로 갈 수 있음.
+        "vscode" | "jetbrains" | "other" => {
+            running
+                .host_name
+                .as_deref()
+                .ok_or_else(|| format!("host_unsupported: missing host name for {host_kind}"))?
         }
         _ => return Err(format!("host_unsupported: unknown host_kind={host_kind}")),
     };
