@@ -832,3 +832,12 @@ body,
   opacity: 1;
   text-decoration: underline;
 }
+.reply-permission-hint {
+  font-size: 10px;
+  color: var(--text-muted, #9aa);
+  opacity: 0.85;
+  line-height: 1.4;
+}
+.reply-permission-hint strong {
+  color: #ddd;
+}

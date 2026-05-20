@@ -178,6 +178,12 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
                 <div>
                   aieye needs Accessibility permission to paste into the terminal.
                 </div>
+                <div className="reply-permission-hint">
+                  Tip: aieye is ad-hoc signed during development, so System Settings may not recognize the latest build. If you already enabled aieye but still see this error, <strong>remove aieye from the Accessibility list and add it again</strong>, then quit and relaunch aieye.
+                </div>
+                <div className="reply-permission-hint">
+                  Alternative: try iTerm2 (no Accessibility needed — only one-time Automation prompt) or switch to Headless mode in Settings.
+                </div>
                 <div className="reply-permission-actions">
                   <button
                     type="button"

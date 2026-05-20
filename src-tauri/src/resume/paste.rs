@@ -15,11 +15,16 @@ pub async fn send(session: &Session, text: &str) -> Result<(), String> {
         .ok_or_else(|| "session_not_running: paste requires running session".to_string())?;
 
     let host_kind = running.host_kind.as_str();
+
+    // iTerm2: native `write text` API. No Accessibility permission needed —
+    // only Automation prompt the first time.
+    if host_kind == "iterm2" {
+        return write_to_iterm(&running.tty, text).await;
+    }
+
     let bundle = match host_kind {
         "terminal" => "Terminal",
-        "iterm2" => "iTerm",
-        // Alacritty/Kitty/IDE: host_name 으로 bundle 식별 (best-effort).
-        // IDE 내장 터미널이 focused 상태일 때 동작. 다른 탭이면 키스트로크가 엉뚱한 곳으로 갈 수 있음.
+        // VS Code / JetBrains / Alacritty / Kitty: host_name 으로 bundle 식별
         "vscode" | "jetbrains" | "other" => {
             running
                 .host_name
@@ -96,5 +101,55 @@ fn write_clipboard(text: &str) -> Result<(), std::io::Error> {
         stdin.write_all(text.as_bytes())?;
     }
     child.wait()?;
+    Ok(())
+}
+
+/// iTerm2 의 `write text` AppleScript API 로 매칭되는 tty 세션에 직접 쓴다.
+/// `keystroke` 를 쓰지 않으므로 Accessibility 권한 불요. iTerm2 자동화 prompt 만 1회 필요.
+async fn write_to_iterm(tty: &str, text: &str) -> Result<(), String> {
+    let tty_esc = tty.replace('\\', "\\\\").replace('"', "\\\"");
+    let text_esc = text.replace('\\', "\\\\").replace('"', "\\\"");
+    let script = format!(
+        r#"
+tell application "iTerm"
+    activate
+    set targetSession to missing value
+    repeat with w in windows
+        repeat with t in tabs of w
+            repeat with s in sessions of t
+                if tty of s is "{tty_esc}" then
+                    tell w to select t
+                    select s
+                    set targetSession to s
+                    exit repeat
+                end if
+            end repeat
+            if targetSession is not missing value then exit repeat
+        end repeat
+        if targetSession is not missing value then exit repeat
+    end repeat
+    if targetSession is missing value then
+        error "session not found for tty {tty_esc}"
+    end if
+    tell targetSession to write text "{text_esc}"
+end tell
+"#
+    );
+    let output = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("osascript").args(["-e", &script]).output()
+    })
+    .await
+    .map_err(|e| format!("process_failed: spawn join: {e}"))?
+    .map_err(|e| format!("process_failed: osascript: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not authorized") || stderr.contains("not allowed") || stderr.contains("1743") {
+            return Err(format!(
+                "permission: iTerm2 automation not allowed. Open System Settings > Privacy > Automation > aieye and enable iTerm. ({stderr})"
+            ));
+        }
+        return Err(format!("process_failed: osascript: {stderr}"));
+    }
     Ok(())
 }
