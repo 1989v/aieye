@@ -65,7 +65,11 @@ pub async fn list_sessions(state: State<'_, SharedTrayState>) -> Result<Vec<Sess
     }
 
     // active(running) 세션의 서브에이전트를 첫 응답에 동봉 (최대 20)
-    let active_count = sessions.iter().filter(|s| s.running.is_some()).count().min(20);
+    let active_count = sessions
+        .iter()
+        .filter(|s| s.running.is_some() && matches!(s.cli, CliKind::Claude))
+        .count()
+        .min(20);
     let mut filled = 0usize;
     for s in sessions.iter_mut() {
         if filled >= active_count { break }
