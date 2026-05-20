@@ -48,6 +48,8 @@ mod tests {
             running: None,
             finished: false,
             inline_preview: None,
+            repo_name: String::new(),
+            subagents: Vec::new(),
         }
     }
 
