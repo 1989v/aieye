@@ -52,6 +52,29 @@ pub async fn list_sessions(state: State<'_, SharedTrayState>) -> Result<Vec<Sess
             last_assistant: p.last_assistant,
         });
     }
+
+    // repo_name: project_path 의 마지막 세그먼트
+    for s in sessions.iter_mut() {
+        s.repo_name = s
+            .project_path
+            .as_deref()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .map(String::from)
+            .unwrap_or_else(|| "(no project)".to_string());
+    }
+
+    // active(running) 세션의 서브에이전트를 첫 응답에 동봉 (최대 20)
+    let active_count = sessions.iter().filter(|s| s.running.is_some()).count().min(20);
+    let mut filled = 0usize;
+    for s in sessions.iter_mut() {
+        if filled >= active_count { break }
+        if s.running.is_none() { continue }
+        if !matches!(s.cli, CliKind::Claude) { continue }
+        s.subagents = crate::parser::extract_subagents(&s.jsonl_path);
+        filled += 1;
+    }
+
     Ok(sessions)
 }
 
@@ -146,6 +169,17 @@ pub fn archive_sessions_bulk(paths: Vec<String>) -> BulkArchiveResult {
         result.errors.len()
     );
     result
+}
+
+#[tauri::command]
+pub fn get_session_subagents(
+    jsonl_path: String,
+    cli: CliKind,
+) -> Vec<crate::sessions::SubagentRow> {
+    if !matches!(cli, CliKind::Claude) {
+        return Vec::new();
+    }
+    crate::parser::extract_subagents(&PathBuf::from(jsonl_path))
 }
 
 #[tauri::command]
