@@ -1,4 +1,5 @@
 pub mod command;
+pub mod paste;
 pub mod running;
 pub mod terminal;
 
