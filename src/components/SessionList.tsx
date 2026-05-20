@@ -12,6 +12,8 @@ interface Props {
   groups: RepoGroup[];
   collapsedRepos: Set<string>;
   onToggleRepo: (name: string) => void;
+  expandedRepos: Set<string>;
+  onToggleRepoExpansion: (name: string) => void;
   groupByRepo: boolean;
   onHover?: (session: Session | null) => void;
   manageMode?: boolean;
@@ -20,6 +22,8 @@ interface Props {
   onToggleSelect?: (id: string) => void;
   onPinReply?: (session: Session) => void;
 }
+
+const DEFAULT_VISIBLE = 5;
 
 function relativeTime(iso: string): string {
   if (!iso) return "";
@@ -34,6 +38,8 @@ export function SessionList({
   groups,
   collapsedRepos,
   onToggleRepo,
+  expandedRepos,
+  onToggleRepoExpansion,
   groupByRepo,
   onHover,
   manageMode,
@@ -51,6 +57,12 @@ export function SessionList({
       {groups.map((g) => {
         const isCollapsed = collapsedRepos.has(g.repoName);
         const showHeader = groupByRepo && (groups.length > 1 || g.repoName !== "");
+        const isExpanded = expandedRepos.has(g.repoName);
+        const visibleSessions =
+          isExpanded || g.sessions.length <= DEFAULT_VISIBLE
+            ? g.sessions
+            : g.sessions.slice(0, DEFAULT_VISIBLE);
+        const hiddenCount = g.sessions.length - visibleSessions.length;
         return (
           <div key={g.repoName || "_flat"} className="repo-group">
             {showHeader && (
@@ -63,7 +75,7 @@ export function SessionList({
               />
             )}
             {!isCollapsed &&
-              g.sessions.map((s) => (
+              visibleSessions.map((s) => (
                 <SessionRow
                   key={`${s.cli}-${s.id}`}
                   session={s}
@@ -75,6 +87,14 @@ export function SessionList({
                   onPinReply={onPinReply}
                 />
               ))}
+            {!isCollapsed && (hiddenCount > 0 || isExpanded) && (
+              <button
+                className="repo-show-more"
+                onClick={() => onToggleRepoExpansion(g.repoName)}
+              >
+                {isExpanded ? "Show less" : `Show ${hiddenCount} more`}
+              </button>
+            )}
           </div>
         );
       })}

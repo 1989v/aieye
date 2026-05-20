@@ -816,3 +816,19 @@ body,
 .reply-permission-actions button:hover {
   background: rgba(255, 255, 255, 0.15);
 }
+
+.repo-show-more {
+  align-self: flex-start;
+  margin: 4px 12px 6px;
+  background: transparent;
+  border: none;
+  color: #6cb6ff;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  opacity: 0.85;
+}
+.repo-show-more:hover {
+  opacity: 1;
+  text-decoration: underline;
+}

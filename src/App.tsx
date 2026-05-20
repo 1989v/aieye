@@ -112,6 +112,16 @@ export default function App() {
     });
   };
 
+  const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set());
+  const toggleRepoExpansion = (name: string) => {
+    setExpandedRepos((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
   const eligibleIds = useMemo(() => {
     const ids = new Set<string>();
     for (const s of filtered) {
@@ -186,6 +196,8 @@ export default function App() {
             groups={grouped}
             collapsedRepos={collapsedRepos}
             onToggleRepo={toggleRepo}
+            expandedRepos={expandedRepos}
+            onToggleRepoExpansion={toggleRepoExpansion}
             groupByRepo={settings?.group_by_repo ?? true}
             onHover={setHovered}
             manageMode={manageMode}

@@ -16,7 +16,7 @@ type SendState =
   | { kind: "error"; message: string };
 
 function classifyError(raw: string): { prefix: string; rest: string } {
-  const m = raw.match(/^([a-z_]+):\s*(.*)$/i);
+  const m = raw.match(/^([a-z_]+):\s*([\s\S]*)$/i);
   if (m) return { prefix: m[1], rest: m[2] };
   return { prefix: "", rest: raw };
 }
