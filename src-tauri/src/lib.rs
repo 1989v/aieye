@@ -32,7 +32,8 @@ pub fn run() {
             commands::get_session_preview,
             commands::archive_session_file,
             commands::archive_sessions_bulk,
-            commands::get_session_subagents
+            commands::get_session_subagents,
+            commands::send_reply
         ]);
 
     #[cfg(target_os = "macos")]

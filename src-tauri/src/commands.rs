@@ -311,3 +311,39 @@ pub fn get_settings() -> Settings {
 pub fn set_settings(settings: Settings) -> Result<(), String> {
     crate::settings::save(&settings).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn send_reply(session: Session, text: String) -> Result<(), String> {
+    use crate::settings::ReplyMode;
+
+    if text.trim().is_empty() {
+        return Err("process_failed: empty message".into());
+    }
+
+    let cfg = crate::settings::load();
+    let mode = cfg.reply_mode;
+
+    // Headless 모드 가드: Claude only + idle only
+    if matches!(mode, ReplyMode::Headless) {
+        if !matches!(session.cli, CliKind::Claude) {
+            return Err(
+                "host_unsupported: Headless 모드는 Claude 세션만 지원합니다.".into()
+            );
+        }
+        let generating = session
+            .running
+            .as_ref()
+            .and_then(|r| r.activity.as_ref())
+            .map(|a| matches!(a, crate::parser::Activity::Generating))
+            .unwrap_or(false);
+        if generating {
+            return Err(
+                "session_running: 세션이 응답 중입니다. paste 모드로 폴백하거나 잠시 후 시도하세요.".into()
+            );
+        }
+        return crate::resume::headless::send(&session, &text).await;
+    }
+
+    // Paste 모드
+    crate::resume::paste::send(&session, &text).await
+}
