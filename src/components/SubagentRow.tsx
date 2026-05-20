@@ -26,13 +26,16 @@ export function SubagentRow({ row }: Props) {
   const time = row.finished_at ?? row.started_at;
   return (
     <div className={`subagent-row state-${row.state}`}>
-      <span className="subagent-glyph">↳</span>
-      <span className="subagent-dot" aria-label={row.state}>
-        {stateDot(row.state)}
-      </span>
-      <span className="subagent-name">{row.name}</span>
-      {row.description && <span className="subagent-desc">{row.description}</span>}
-      <span className="subagent-time">{relativeTime(time)}</span>
+      <div className="subagent-line1">
+        <span className="subagent-glyph">↳</span>
+        <span className="subagent-dot" aria-label={row.state}>
+          {stateDot(row.state)}
+        </span>
+        <span className="subagent-name">{row.name}</span>
+        {row.description && <span className="subagent-desc">{row.description}</span>}
+        <span className="subagent-time">{relativeTime(time)}</span>
+      </div>
+      {row.last_text && <div className="subagent-last-text">{row.last_text}</div>}
     </div>
   );
 }

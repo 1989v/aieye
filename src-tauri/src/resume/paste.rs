@@ -22,7 +22,7 @@ pub async fn send(session: &Session, text: &str) -> Result<(), String> {
         "other" => running.host_name.as_deref().unwrap_or("Terminal"),
         "vscode" | "jetbrains" => {
             return Err(format!(
-                "host_unsupported: paste 는 Terminal/iTerm2 에서만 지원합니다 (현재: {host_kind})"
+                "host_unsupported: paste only works in Terminal/iTerm2 (got: {host_kind})"
             ));
         }
         _ => return Err(format!("host_unsupported: unknown host_kind={host_kind}")),

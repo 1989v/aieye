@@ -37,7 +37,7 @@ pub async fn send(session: &Session, text: &str) -> Result<(), String> {
             tracing::info!(
                 "headless reply detached (>30s); next poll will pick it up"
             );
-            Err("process_timeout: 응답 대기 30초 초과. 백그라운드에서 진행 중입니다.".to_string())
+            Err("process_timeout: 30s timeout exceeded. Reply continues in background; next poll will pick it up.".to_string())
         }
     }
 }

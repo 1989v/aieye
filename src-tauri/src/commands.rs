@@ -327,7 +327,7 @@ pub async fn send_reply(session: Session, text: String) -> Result<(), String> {
     if matches!(mode, ReplyMode::Headless) {
         if !matches!(session.cli, CliKind::Claude) {
             return Err(
-                "host_unsupported: Headless 모드는 Claude 세션만 지원합니다.".into()
+                "host_unsupported: Headless mode only supports Claude sessions.".into()
             );
         }
         let generating = session
@@ -338,7 +338,7 @@ pub async fn send_reply(session: Session, text: String) -> Result<(), String> {
             .unwrap_or(false);
         if generating {
             return Err(
-                "session_running: 세션이 응답 중입니다. paste 모드로 폴백하거나 잠시 후 시도하세요.".into()
+                "session_running: Session is generating. Switch to paste mode or wait.".into()
             );
         }
         return crate::resume::headless::send(&session, &text).await;
