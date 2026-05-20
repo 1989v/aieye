@@ -35,6 +35,18 @@ export interface SessionPreview {
   recent_turns: Turn[];
 }
 
+export type SubagentState = "pending" | "running" | "completed" | "errored";
+
+export interface SubagentRow {
+  id: string;
+  name: string;
+  description?: string | null;
+  state: SubagentState;
+  last_text?: string | null;
+  started_at: string;
+  finished_at?: string | null;
+}
+
 export interface Session {
   id: string;
   cli: CliKind;
@@ -48,4 +60,6 @@ export interface Session {
   running?: RunningInfo | null;
   finished?: boolean;
   inline_preview?: SessionPreviewInline | null;
+  repo_name: string;
+  subagents: SubagentRow[];
 }

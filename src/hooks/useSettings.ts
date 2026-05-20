@@ -11,7 +11,12 @@ export function useSettings() {
 
   const update = useCallback((patch: Partial<Settings>) => {
     setSettings((prev) => {
-      const base: Settings = prev ?? { preferred_terminal: "terminal", recent_threshold_minutes: 60 };
+      const base: Settings = prev ?? {
+        preferred_terminal: "terminal",
+        recent_threshold_minutes: 60,
+        reply_mode: "paste",
+        group_by_repo: true,
+      };
       const next: Settings = { ...base, ...patch };
       saveSettings(next).catch((e) => console.error("save settings failed", e));
       return next;

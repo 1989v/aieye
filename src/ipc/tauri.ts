@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CliKind, Session, SessionPreview, TerminalApp } from "../types/session";
+import type { CliKind, Session, SessionPreview, SubagentRow, TerminalApp } from "../types/session";
 import type { Settings } from "../types/settings";
 
 export async function listSessions(): Promise<Session[]> {
@@ -56,4 +56,15 @@ export interface BulkArchiveResult {
 
 export async function archiveSessionsBulk(paths: string[]): Promise<BulkArchiveResult> {
   return invoke<BulkArchiveResult>("archive_sessions_bulk", { paths });
+}
+
+export async function sendReply(session: Session, text: string): Promise<void> {
+  await invoke("send_reply", { session, text });
+}
+
+export async function getSessionSubagents(
+  jsonlPath: string,
+  cli: CliKind,
+): Promise<SubagentRow[]> {
+  return invoke<SubagentRow[]>("get_session_subagents", { jsonlPath, cli });
 }
