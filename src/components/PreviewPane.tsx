@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session, SessionPreview } from "../types/session";
-import { getSessionPreview, openAccessibilitySettings, sendReply } from "../ipc/tauri";
+import { getSessionPreview, openAccessibilitySettings, sendReply, setSettings as saveSettings } from "../ipc/tauri";
+import { useSettings } from "../hooks/useSettings";
 
 interface Props {
   session: Session | null;
@@ -47,6 +48,14 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
   const [sendState, setSendState] = useState<SendState>({ kind: "idle" });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const turnsRef = useRef<HTMLDivElement>(null);
+  const { settings, update } = useSettings();
+
+  const switchToHeadless = async () => {
+    if (!settings) return;
+    const next = { ...settings, reply_mode: "headless" as const };
+    update({ reply_mode: "headless" });
+    await saveSettings(next);
+  };
 
   useEffect(() => {
     if (!session) {
@@ -182,7 +191,7 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
                   Tip: aieye is ad-hoc signed during development, so System Settings may not recognize the latest build. If you already enabled aieye but still see this error, <strong>remove aieye from the Accessibility list and add it again</strong>, then quit and relaunch aieye.
                 </div>
                 <div className="reply-permission-hint">
-                  Alternative: try iTerm2 (no Accessibility needed — only one-time Automation prompt) or switch to Headless mode in Settings.
+                  Alternatives — try iTerm2 (only one-time Automation prompt, no Accessibility), or use <strong>Headless mode</strong> which bypasses permissions entirely. Note: Claude Code headless usage may be separately billed from mid-2026.
                 </div>
                 <div className="reply-permission-actions">
                   <button
@@ -193,6 +202,19 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
                   >
                     Open System Settings
                   </button>
+                  {settings && settings.reply_mode !== "headless" && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (sendState.kind !== "permission") return;
+                        const pending = sendState.pendingText;
+                        await switchToHeadless();
+                        await doSend(pending);
+                      }}
+                    >
+                      Switch to Headless & retry
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {

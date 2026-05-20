@@ -841,3 +841,7 @@ body,
 .reply-permission-hint strong {
   color: #ddd;
 }
+
+.reply-permission-actions {
+  flex-wrap: wrap;
+}
