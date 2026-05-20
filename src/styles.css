@@ -603,3 +603,52 @@ body,
   font-size: 10px;
   opacity: 0.6;
 }
+.subagent-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+}
+.subagent-list li {
+  padding: 0;
+}
+.subagent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px 3px 36px;
+  font-size: 11px;
+  color: var(--text-muted, #9aa);
+  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  margin-left: 24px;
+}
+.subagent-row .subagent-glyph {
+  opacity: 0.5;
+}
+.subagent-row .subagent-dot {
+  width: 10px;
+  text-align: center;
+  font-size: 10px;
+}
+.subagent-row.state-running .subagent-dot { color: #6cb6ff; animation: blink 1.4s infinite; }
+.subagent-row.state-completed .subagent-dot { color: #6cd07a; }
+.subagent-row.state-errored .subagent-dot { color: #e57373; }
+.subagent-row.state-pending .subagent-dot { color: #999; }
+.subagent-row .subagent-name {
+  color: var(--text, #ddd);
+  font-weight: 500;
+}
+.subagent-row .subagent-desc {
+  opacity: 0.7;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.subagent-row .subagent-time {
+  font-size: 10px;
+  opacity: 0.5;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}

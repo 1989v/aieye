@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { Session } from "../types/session";
+import type { Session, SubagentRow as SubagentRowData } from "../types/session";
 import {
   archiveSessionFile,
+  getSessionSubagents,
   resumeSession,
   resumeSessionForceNew,
   revealInFinder,
 } from "../ipc/tauri";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { SubagentRow } from "./SubagentRow";
 
 function relativeTime(iso: string): string {
   const delta = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -61,6 +63,35 @@ export function SessionRow({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [subagents, setSubagents] = useState<SubagentRowData[]>(session.subagents ?? []);
+  const [subagentsFetched, setSubagentsFetched] = useState(
+    (session.subagents ?? []).length > 0,
+  );
+
+  useEffect(() => {
+    if (session.subagents && session.subagents.length > 0) {
+      setSubagents(session.subagents);
+      setSubagentsFetched(true);
+    }
+  }, [session.subagents]);
+
+  useEffect(() => {
+    if (session.cli !== "claude") return;
+    if (subagentsFetched) return;
+    let cancelled = false;
+    getSessionSubagents(session.jsonl_path, session.cli)
+      .then((rows) => {
+        if (!cancelled) {
+          setSubagents(rows);
+          setSubagentsFetched(true);
+        }
+      })
+      .catch((e) => console.error("getSessionSubagents failed", e));
+    return () => {
+      cancelled = true;
+    };
+  }, [session.jsonl_path, session.cli, subagentsFetched]);
+
   const rootRef = useRef<HTMLDivElement>(null);
 
   // 바깥 클릭/focus 이동/ESC/panel blur 시 overflow 메뉴 자동 닫힘
@@ -155,6 +186,15 @@ export function SessionRow({
       >
         ⋯
       </button>
+      {subagents.length > 0 && (
+        <ul className="subagent-list">
+          {subagents.map((sa) => (
+            <li key={sa.id}>
+              <SubagentRow row={sa} />
+            </li>
+          ))}
+        </ul>
+      )}
       <ConfirmDialog
         open={confirmArchive}
         title="Move session to Trash"
