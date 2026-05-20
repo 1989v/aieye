@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { TerminalApp } from "../types/session";
+import type { ReplyMode } from "../types/settings";
 import { useSettings } from "../hooks/useSettings";
 import { listInstalledTerminals } from "../ipc/tauri";
 
@@ -8,6 +9,11 @@ const LABELS: Record<TerminalApp, string> = {
   iterm2: "iTerm2",
   alacritty: "Alacritty",
   kitty: "kitty",
+};
+
+const REPLY_LABELS: Record<ReplyMode, string> = {
+  paste: "Paste to terminal",
+  headless: "Headless (Claude only, idle)",
 };
 
 export function SettingsMenu() {
@@ -60,6 +66,44 @@ export function SettingsMenu() {
               }
             />
           </label>
+          <label className="settings-checkbox">
+            <input
+              type="checkbox"
+              checked={settings.group_by_repo}
+              onChange={(e) => update({ group_by_repo: e.target.checked })}
+            />
+            <span>Group sessions by repo</span>
+          </label>
+          <fieldset className="settings-fieldset">
+            <legend>Reply mode</legend>
+            {(Object.keys(REPLY_LABELS) as ReplyMode[]).map((m) => (
+              <label key={m} className="settings-radio">
+                <input
+                  type="radio"
+                  name="reply_mode"
+                  value={m}
+                  checked={settings.reply_mode === m}
+                  onChange={() => update({ reply_mode: m })}
+                />
+                <span>{REPLY_LABELS[m]}</span>
+              </label>
+            ))}
+            <p className="settings-help">
+              Paste mode requires Accessibility permission. Open{" "}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open?.(
+                    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                  );
+                }}
+              >
+                System Settings → Privacy → Accessibility
+              </a>
+              .
+            </p>
+          </fieldset>
         </div>
       )}
     </div>

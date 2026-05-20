@@ -740,3 +740,36 @@ body,
 .row-reply-btn:hover {
   color: #6cb6ff;
 }
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.settings-fieldset {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 8px;
+}
+.settings-fieldset legend {
+  font-size: 11px;
+  opacity: 0.7;
+  padding: 0 4px;
+}
+.settings-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin: 4px 0;
+}
+.settings-help {
+  font-size: 10px;
+  opacity: 0.6;
+  margin: 6px 0 0 0;
+}
+.settings-help a {
+  color: #6cb6ff;
+  text-decoration: underline;
+}
