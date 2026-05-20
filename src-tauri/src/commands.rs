@@ -313,6 +313,15 @@ pub fn set_settings(settings: Settings) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_accessibility_settings() -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .status()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn send_reply(session: Session, text: String) -> Result<(), String> {
     use crate::settings::ReplyMode;
 

@@ -33,7 +33,8 @@ pub fn run() {
             commands::archive_session_file,
             commands::archive_sessions_bulk,
             commands::get_session_subagents,
-            commands::send_reply
+            commands::send_reply,
+            commands::open_accessibility_settings
         ]);
 
     #[cfg(target_os = "macos")]

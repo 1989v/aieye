@@ -68,3 +68,7 @@ export async function getSessionSubagents(
 ): Promise<SubagentRow[]> {
   return invoke<SubagentRow[]>("get_session_subagents", { jsonlPath, cli });
 }
+
+export async function openAccessibilitySettings(): Promise<void> {
+  await invoke("open_accessibility_settings");
+}

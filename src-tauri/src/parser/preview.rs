@@ -34,7 +34,7 @@ pub struct SessionPreview {
     pub last_user: Option<String>,
     /// 가장 최근 assistant 텍스트 (tool_use/thinking 제외, truncate).
     pub last_assistant: Option<String>,
-    /// 최신 → 과거 순 정렬된 턴 리스트 (hover 패널용).
+    /// 오래된 → 최신 순(시간순) 정렬된 턴 리스트 (hover 패널용).
     pub recent_turns: Vec<Turn>,
 }
 
@@ -133,9 +133,11 @@ fn summarize(mut turns: Vec<Turn>) -> SessionPreview {
         .rev()
         .find(|t| matches!(t.role, TurnRole::Assistant))
         .map(|t| t.text.clone());
-    // 최신 10턴만 최신순 역정렬
-    turns.reverse();
-    turns.truncate(10);
+    // 최신 10턴만, 시간순(오래된 → 최신) 표시
+    if turns.len() > 10 {
+        let skip = turns.len() - 10;
+        turns.drain(0..skip);
+    }
     SessionPreview {
         last_user,
         last_assistant,

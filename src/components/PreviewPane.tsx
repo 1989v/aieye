@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session, SessionPreview } from "../types/session";
-import { getSessionPreview, sendReply } from "../ipc/tauri";
+import { getSessionPreview, openAccessibilitySettings, sendReply } from "../ipc/tauri";
 
 interface Props {
   session: Session | null;
@@ -12,6 +12,7 @@ type SendState =
   | { kind: "idle" }
   | { kind: "sending" }
   | { kind: "done" }
+  | { kind: "permission"; pendingText: string }
   | { kind: "error"; message: string };
 
 function classifyError(raw: string): { prefix: string; rest: string } {
@@ -45,6 +46,7 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
   const [replyText, setReplyText] = useState("");
   const [sendState, setSendState] = useState<SendState>({ kind: "idle" });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const turnsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!session) {
@@ -75,10 +77,14 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
     }
   }, [focusReplyKey]);
 
-  const onSend = async () => {
+  useEffect(() => {
+    if (preview && preview.recent_turns.length > 0 && turnsRef.current) {
+      turnsRef.current.scrollTop = turnsRef.current.scrollHeight;
+    }
+  }, [preview]);
+
+  const doSend = async (text: string) => {
     if (!session) return;
-    const text = replyText.trim();
-    if (!text) return;
     setSendState({ kind: "sending" });
     try {
       await sendReply(session, text);
@@ -88,11 +94,21 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
     } catch (e) {
       const raw = String(e);
       const { prefix } = classifyError(raw);
-      setSendState({
-        kind: "error",
-        message: `${raw}\n${errorHint(prefix)}`,
-      });
+      if (prefix === "permission") {
+        setSendState({ kind: "permission", pendingText: text });
+      } else {
+        setSendState({
+          kind: "error",
+          message: `${raw}\n${errorHint(prefix)}`,
+        });
+      }
     }
+  };
+
+  const onSend = async () => {
+    const text = replyText.trim();
+    if (!text) return;
+    await doSend(text);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -132,7 +148,7 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
         <div className="hint">No recent messages.</div>
       )}
       {preview && preview.recent_turns.length > 0 && (
-        <div className="turns">
+        <div className="turns" ref={turnsRef}>
           {preview.recent_turns.map((t, i) => (
             <div key={i} className={`turn ${t.role}`}>
               <div className="turn-role">{t.role === "user" ? "You" : "AI"}</div>
@@ -157,6 +173,33 @@ export function PreviewPane({ session, focusReplyKey, onUnpin }: Props) {
             {sendState.kind === "sending" && "Sending…"}
             {sendState.kind === "done" && "Sent ✓"}
             {sendState.kind === "error" && <pre>{sendState.message}</pre>}
+            {sendState.kind === "permission" && (
+              <div className="reply-permission">
+                <div>
+                  aieye needs Accessibility permission to paste into the terminal.
+                </div>
+                <div className="reply-permission-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openAccessibilitySettings().catch((err) => console.error(err));
+                    }}
+                  >
+                    Open System Settings
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (sendState.kind === "permission") {
+                        doSend(sendState.pendingText);
+                      }
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
           </span>
           <button
             className="reply-send"
