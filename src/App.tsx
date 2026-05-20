@@ -35,6 +35,15 @@ export default function App() {
   const { sessions, error } = useSessions();
   const { settings } = useSettings();
   const [hovered, setHovered] = useState<Session | null>(null);
+  const [pinned, setPinned] = useState<Session | null>(null);
+  const [focusKey, setFocusKey] = useState(0);
+
+  const previewTarget = pinned ?? hovered;
+
+  const pinSessionForReply = (s: Session) => {
+    setPinned(s);
+    setFocusKey((k) => k + 1);
+  };
   const [manageMode, setManageMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<FilterState>({
@@ -183,12 +192,17 @@ export default function App() {
             selected={selected}
             eligibleIds={eligibleIds}
             onToggleSelect={toggleSelect}
+            onPinReply={pinSessionForReply}
           />
         )}
         <SettingsMenu />
       </div>
       <div className="right">
-        <PreviewPane session={hovered} />
+        <PreviewPane
+          session={previewTarget}
+          focusReplyKey={focusKey}
+          onUnpin={pinned ? () => setPinned(null) : undefined}
+        />
       </div>
 
       <ConfirmDialog

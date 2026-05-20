@@ -18,6 +18,7 @@ interface Props {
   selected?: Set<string>;
   eligibleIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  onPinReply?: (session: Session) => void;
 }
 
 function relativeTime(iso: string): string {
@@ -39,6 +40,7 @@ export function SessionList({
   selected,
   eligibleIds,
   onToggleSelect,
+  onPinReply,
 }: Props) {
   const totalSessions = groups.reduce((sum, g) => sum + g.sessions.length, 0);
   if (totalSessions === 0) {
@@ -70,6 +72,7 @@ export function SessionList({
                   selected={selected?.has(s.id)}
                   eligible={eligibleIds?.has(s.id) ?? false}
                   onToggleSelect={onToggleSelect}
+                  onPinReply={onPinReply}
                 />
               ))}
           </div>

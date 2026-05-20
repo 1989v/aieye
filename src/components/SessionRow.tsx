@@ -51,6 +51,7 @@ interface Props {
   selected?: boolean;
   eligible?: boolean;
   onToggleSelect?: (id: string) => void;
+  onPinReply?: (session: Session) => void;
 }
 
 export function SessionRow({
@@ -60,6 +61,7 @@ export function SessionRow({
   selected,
   eligible,
   onToggleSelect,
+  onPinReply,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
@@ -176,6 +178,17 @@ export function SessionRow({
           <div className="running-badge">● live · {hostLabel(session.running)}</div>
         )}
       </div>
+      <button
+        className="row-reply-btn"
+        data-row-action="reply"
+        title="Reply in panel"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPinReply?.(session);
+        }}
+      >
+        ✉
+      </button>
       <button
         className="row-menu-btn"
         data-row-action="menu"
